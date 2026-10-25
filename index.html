@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="بنك أسئلة المعلم: أنشئ بنك أسئلتك الخاص وولّد اختبارات عشوائية جاهزة للطباعة.">
+  <title>تسجيل الدخول | بنك أسئلة المعلم</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./css/style.css">
+  <script type="module" src="./js/index.js"></script>
+</head>
+<body data-page="auth">
+  <a class="skip-link" href="#main-content">تخطَّ إلى المحتوى</a>
+
+  <header class="site-header landing-header no-print">
+    <div class="container nav-wrap">
+      <a class="brand" href="./index.html" aria-label="بنك أسئلة المعلم">
+        <span class="brand-mark" aria-hidden="true">ب</span>
+        <span class="brand-text">بنك أسئلة المعلم</span>
+      </a>
+      <span class="landing-badge">مساحة خاصة لكل معلم</span>
+    </div>
+  </header>
+
+  <main id="main-content" class="landing">
+    <div class="container landing-grid">
+      <section class="hero" aria-labelledby="hero-title">
+        <p class="eyebrow">بنك أسئلة ذكي</p>
+        <h1 id="hero-title">أسئلتك في مكان واحد،<br>واختباراتك جاهزة بضغطة.</h1>
+        <p class="hero-text">
+          نظّم أسئلتك حسب المادة والصف والوحدة والصعوبة، ثم ولّد اختبارات عشوائية
+          متوازنة واطبعها مباشرة مع نموذج الإجابة.
+        </p>
+
+        <ul class="feature-list">
+          <li>
+            <span class="feature-icon" aria-hidden="true">١</span>
+            <div>
+              <strong>بنك أسئلة منظّم</strong>
+              <span>مواد، وحدات، مستويات، وصعوبات في هيكل واضح.</span>
+            </div>
+          </li>
+          <li>
+            <span class="feature-icon" aria-hidden="true">٢</span>
+            <div>
+              <strong>خصوصية كاملة</strong>
+              <span>كل معلم يرى بياناته فقط، والحماية مطبقة في قاعدة البيانات.</span>
+            </div>
+          </li>
+          <li>
+            <span class="feature-icon" aria-hidden="true">٣</span>
+            <div>
+              <strong>اختبارات ثابتة تاريخياً</strong>
+              <span>تعديل السؤال أو حذفه لا يغيّر الاختبارات المحفوظة سابقاً.</span>
+            </div>
+          </li>
+        </ul>
+      </section>
+
+      <section class="auth-card" aria-labelledby="auth-title">
+        <div class="auth-card-head">
+          <h2 id="auth-title">ابدأ الآن</h2>
+          <p>سجّل دخولك أو أنشئ حساب معلم جديداً.</p>
+        </div>
+
+        <div id="setup-notice" class="notice notice-warning" hidden>
+          <strong>إعداد مطلوب:</strong>
+          <span>أضف بيانات مشروع Supabase داخل <code>js/config.js</code> لتفعيل تسجيل الدخول.</span>
+        </div>
+
+        <div id="auth-feedback" class="auth-feedback" role="status" hidden></div>
+
+        <div class="tabs" role="tablist" aria-label="الدخول أو إنشاء حساب">
+          <button class="tab active" id="tab-login" type="button" role="tab" aria-selected="true" aria-controls="login-panel">تسجيل الدخول</button>
+          <button class="tab" id="tab-signup" type="button" role="tab" aria-selected="false" aria-controls="signup-panel">إنشاء حساب</button>
+        </div>
+
+        <section id="login-panel" role="tabpanel" aria-labelledby="tab-login">
+          <form id="login-form" class="auth-form" novalidate>
+            <div class="field">
+              <label for="login-email">البريد الإلكتروني</label>
+              <input id="login-email" name="email" type="email" dir="ltr" autocomplete="email" placeholder="teacher@example.com" required>
+            </div>
+
+            <div class="field">
+              <label for="login-password">كلمة المرور</label>
+              <input id="login-password" name="password" type="password" dir="ltr" autocomplete="current-password" placeholder="••••••••" required>
+            </div>
+
+            <p class="form-error" id="login-error" role="alert" hidden></p>
+
+            <button class="btn btn-primary btn-block" id="login-submit" type="submit">تسجيل الدخول</button>
+          </form>
+        </section>
+
+        <section id="signup-panel" role="tabpanel" aria-labelledby="tab-signup" hidden>
+          <form id="signup-form" class="auth-form" novalidate>
+            <div class="field">
+              <label for="signup-name">اسم المعلم</label>
+              <input id="signup-name" name="name" type="text" autocomplete="name" placeholder="مثال: أحمد محمد" required>
+            </div>
+
+            <div class="field">
+              <label for="signup-email">البريد الإلكتروني</label>
+              <input id="signup-email" name="email" type="email" dir="ltr" autocomplete="email" placeholder="teacher@example.com" required>
+            </div>
+
+            <div class="field-row">
+              <div class="field">
+                <label for="signup-password">كلمة المرور</label>
+                <input id="signup-password" name="password" type="password" dir="ltr" autocomplete="new-password" placeholder="6 أحرف على الأقل" required>
+              </div>
+              <div class="field">
+                <label for="signup-confirm">تأكيد كلمة المرور</label>
+                <input id="signup-confirm" name="confirm" type="password" dir="ltr" autocomplete="new-password" placeholder="أعد كتابة كلمة المرور" required>
+              </div>
+            </div>
+
+            <p class="form-hint">سيتم حفظ اسمك في بيانات حسابك داخل Supabase Auth.</p>
+            <p class="form-error" id="signup-error" role="alert" hidden></p>
+
+            <button class="btn btn-primary btn-block" id="signup-submit" type="submit">إنشاء الحساب</button>
+          </form>
+        </section>
+
+        <p class="auth-footnote">
+          بياناتك محمية عبر Supabase Auth وسياسات Row Level Security.
+        </p>
+      </section>
+    </div>
+  </main>
+
+  <footer class="site-footer no-print">
+    <div class="container">
+      <p>بنك أسئلة المعلم — نظّم أسئلتك، واصنع اختبارك في دقائق.</p>
+    </div>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>لوحة التحكم | بنك أسئلة المعلم</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./css/style.css">
+  <script type="module" src="./js/dashboard.js"></script>
+</head>
+<body data-page="dashboard" class="auth-pending">
+  <a class="skip-link" href="#main-content">تخطَّ إلى المحتوى</a>
+
+  <div id="page-loading" class="page-loader" role="status" aria-live="polite">
+    <span class="spinner" aria-hidden="true"></span>
+    <p id="page-loading-text">جارٍ التحقق من الجلسة...</p>
+  </div>
+
+  <header class="site-header no-print">
+    <div class="container nav-wrap">
+      <a class="brand" href="./dashboard.html" aria-label="بنك أسئلة المعلم">
+        <span class="brand-mark" aria-hidden="true">ب</span>
+        <span class="brand-text">بنك أسئلة المعلم</span>
+      </a>
+
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-label="فتح قائمة التنقل" aria-expanded="false" aria-controls="main-nav">☰</button>
+
+      <nav class="main-nav" id="main-nav" aria-label="التنقل الرئيسي">
+        <a href="./dashboard.html" data-nav="dashboard">لوحة التحكم</a>
+        <a href="./subjects.html" data-nav="subjects">المواد</a>
+        <a href="./questions.html" data-nav="questions">الأسئلة</a>
+        <a href="./exam-builder.html" data-nav="builder">إنشاء اختبار</a>
+        <a href="./exam-view.html" data-nav="exams">الاختبارات</a>
+      </nav>
+
+      <div class="nav-user">
+        <span class="nav-user-name" id="nav-user-name">المعلم</span>
+        <button class="btn btn-ghost btn-sm" id="logout-btn" type="button">تسجيل الخروج</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main-content" class="container page">
+    <section class="page-head">
+      <div>
+        <p class="eyebrow">لوحة التحكم</p>
+        <h1>مرحباً، <span id="welcome-name">المعلم</span></h1>
+        <p class="muted">نظرة سريعة على بنك أسئلتك واختباراتك.</p>
+      </div>
+
+      <div class="page-actions no-print">
+        <a class="btn btn-primary" href="./questions.html?new=1">إضافة سؤال</a>
+        <a class="btn btn-outline" href="./exam-builder.html">إنشاء اختبار</a>
+        <a class="btn btn-ghost" href="./subjects.html">إدارة المواد</a>
+      </div>
+    </section>
+
+    <section class="stats-grid" aria-label="ملخص الإحصائيات">
+      <a class="stat-card" href="./subjects.html">
+        <span class="stat-icon" aria-hidden="true">م</span>
+        <span class="stat-label">المواد</span>
+        <strong class="stat-value" id="stat-subjects">—</strong>
+      </a>
+      <a class="stat-card" href="./questions.html">
+        <span class="stat-icon" aria-hidden="true">س</span>
+        <span class="stat-label">الأسئلة</span>
+        <strong class="stat-value" id="stat-questions">—</strong>
+      </a>
+      <a class="stat-card" href="./exam-view.html">
+        <span class="stat-icon" aria-hidden="true">خ</span>
+        <span class="stat-label">الاختبارات المحفوظة</span>
+        <strong class="stat-value" id="stat-exams">—</strong>
+      </a>
+    </section>
+
+    <div class="dashboard-grid">
+      <section class="card">
+        <div class="card-head">
+          <h2>توزيع الأسئلة حسب الصعوبة</h2>
+          <a class="link" href="./questions.html">عرض الأسئلة</a>
+        </div>
+
+        <div class="difficulty-list" id="difficulty-list">
+          <div class="difficulty-row">
+            <div class="difficulty-meta">
+              <span class="badge badge-easy">سهل</span>
+              <span class="difficulty-count" id="count-easy">—</span>
+            </div>
+            <div class="meter" aria-hidden="true"><span class="meter-fill easy" id="bar-easy"></span></div>
+          </div>
+
+          <div class="difficulty-row">
+            <div class="difficulty-meta">
+              <span class="badge badge-medium">متوسط</span>
+              <span class="difficulty-count" id="count-medium">—</span>
+            </div>
+            <div class="meter" aria-hidden="true"><span class="meter-fill medium" id="bar-medium"></span></div>
+          </div>
+
+          <div class="difficulty-row">
+            <div class="difficulty-meta">
+              <span class="badge badge-hard">صعب</span>
+              <span class="difficulty-count" id="count-hard">—</span>
+            </div>
+            <div class="meter" aria-hidden="true"><span class="meter-fill hard" id="bar-hard"></span></div>
+          </div>
+        </div>
+
+        <p class="stat-footnote" id="difficulty-total">إجمالي الأسئلة: —</p>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>آخر الأسئلة المضافة</h2>
+          <a class="link" href="./questions.html">كل الأسئلة</a>
+        </div>
+        <div id="latest-questions" class="latest-list" aria-live="polite">
+          <div class="skeleton-list" aria-hidden="true">
+            <span class="skeleton-line"></span>
+            <span class="skeleton-line"></span>
+            <span class="skeleton-line"></span>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="site-footer no-print">
+    <div class="container">
+      <p>بنك أسئلة المعلم — بياناتك خاصة بك وحدك.</p>
+    </div>
+  </footer>
+</body>
+</html>

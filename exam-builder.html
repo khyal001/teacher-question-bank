@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>إنشاء اختبار | بنك أسئلة المعلم</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./css/style.css">
+  <script type="module" src="./js/exam-builder.js"></script>
+</head>
+<body data-page="builder" class="auth-pending">
+  <a class="skip-link" href="#main-content">تخطَّ إلى المحتوى</a>
+
+  <div id="page-loading" class="page-loader" role="status" aria-live="polite">
+    <span class="spinner" aria-hidden="true"></span>
+    <p id="page-loading-text">جارٍ التحقق من الجلسة...</p>
+  </div>
+
+  <header class="site-header no-print">
+    <div class="container nav-wrap">
+      <a class="brand" href="./dashboard.html" aria-label="بنك أسئلة المعلم">
+        <span class="brand-mark" aria-hidden="true">ب</span>
+        <span class="brand-text">بنك أسئلة المعلم</span>
+      </a>
+
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-label="فتح قائمة التنقل" aria-expanded="false" aria-controls="main-nav">☰</button>
+
+      <nav class="main-nav" id="main-nav" aria-label="التنقل الرئيسي">
+        <a href="./dashboard.html" data-nav="dashboard">لوحة التحكم</a>
+        <a href="./subjects.html" data-nav="subjects">المواد</a>
+        <a href="./questions.html" data-nav="questions">الأسئلة</a>
+        <a href="./exam-builder.html" data-nav="builder">إنشاء اختبار</a>
+        <a href="./exam-view.html" data-nav="exams">الاختبارات</a>
+      </nav>
+
+      <div class="nav-user">
+        <span class="nav-user-name" id="nav-user-name">المعلم</span>
+        <button class="btn btn-ghost btn-sm" id="logout-btn" type="button">تسجيل الخروج</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main-content" class="container page">
+    <section class="page-head">
+      <div>
+        <p class="eyebrow">مولّد الاختبارات</p>
+        <h1>إنشاء اختبار عشوائي</h1>
+        <p class="muted">اختر المادة وعدد الأسئلة من كل مستوى، ثم راجع المعاينة قبل الحفظ.</p>
+      </div>
+      <div class="page-actions no-print">
+        <a class="btn btn-ghost" href="./exam-view.html">الاختبارات المحفوظة</a>
+      </div>
+    </section>
+
+    <div class="builder-grid">
+      <section class="card builder-form-card">
+        <div class="card-head">
+          <h2>إعدادات الاختبار</h2>
+        </div>
+
+        <form id="exam-form" class="builder-form" novalidate>
+          <div class="field">
+            <label for="exam-subject">المادة <span class="req">*</span></label>
+            <select id="exam-subject" required>
+              <option value="">اختر المادة</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="exam-title">عنوان الاختبار <span class="req">*</span></label>
+            <input id="exam-title" type="text" maxlength="160" placeholder="مثال: اختبار منتصف الفصل الأول" required>
+          </div>
+
+          <div class="field">
+            <label for="exam-duration">المدة بالدقائق</label>
+            <input id="exam-duration" type="number" min="1" step="1" placeholder="مثال: 45">
+            <p class="form-hint">اختياري.</p>
+          </div>
+
+          <fieldset class="count-fieldset">
+            <legend>عدد الأسئلة المطلوبة <span class="req">*</span></legend>
+
+            <div class="count-grid">
+              <div class="count-field">
+                <label for="count-easy">سهل</label>
+                <input id="count-easy" type="number" min="0" step="1" value="0" inputmode="numeric">
+                <span class="available-hint" id="available-easy">المتاح: —</span>
+              </div>
+
+              <div class="count-field">
+                <label for="count-medium">متوسط</label>
+                <input id="count-medium" type="number" min="0" step="1" value="0" inputmode="numeric">
+                <span class="available-hint" id="available-medium">المتاح: —</span>
+              </div>
+
+              <div class="count-field">
+                <label for="count-hard">صعب</label>
+                <input id="count-hard" type="number" min="0" step="1" value="0" inputmode="numeric">
+                <span class="available-hint" id="available-hard">المتاح: —</span>
+              </div>
+            </div>
+
+            <p class="availability-note" id="availability-note">اختر المادة لعرض الأسئلة المتاحة.</p>
+          </fieldset>
+
+          <label class="check-option">
+            <input id="shuffle-options" type="checkbox">
+            <span>
+              <strong>خلط ترتيب خيارات الاختيار من متعدد</strong>
+              <small>يُطبّق مرة واحدة عند التوليد أو الاستبدال، ثم يبقى ثابتاً في المعاينة والاختبار المحفوظ.</small>
+            </span>
+          </label>
+
+          <p class="form-error" id="builder-error" role="alert" hidden></p>
+
+          <button class="btn btn-primary btn-block" id="generate-btn" type="submit">توليد المعاينة</button>
+        </form>
+      </section>
+
+      <section class="card preview-card" aria-labelledby="preview-title">
+        <div class="card-head">
+          <h2 id="preview-title">معاينة الاختبار</h2>
+          <span class="count-pill" id="preview-count">0 سؤال</span>
+        </div>
+
+        <div id="preview-area" aria-live="polite">
+          <div class="empty-state">
+            <div class="empty-icon" aria-hidden="true">✦</div>
+            <h3>لم يتم توليد اختبار بعد</h3>
+            <p>اختر المادة وعدد الأسئلة، ثم اضغط «توليد المعاينة».</p>
+          </div>
+        </div>
+
+        <div class="preview-actions" id="preview-actions" hidden>
+          <button class="btn btn-primary" id="save-exam-btn" type="button">حفظ الاختبار</button>
+          <button class="btn btn-ghost" id="regenerate-btn" type="button">إعادة التوليد</button>
+          <button class="btn btn-ghost" id="cancel-preview-btn" type="button">إلغاء المعاينة</button>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="site-footer no-print">
+    <div class="container">
+      <p>بنك أسئلة المعلم — اختبارك يُحفظ بنسخة ثابتة لا تتأثر بتعديلات لاحقة.</p>
+    </div>
+  </footer>
+</body>
+</html>

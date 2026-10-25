@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>الاختبارات | بنك أسئلة المعلم</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./css/style.css">
+  <script type="module" src="./js/exam-view.js"></script>
+</head>
+<body data-page="exams" class="auth-pending">
+  <a class="skip-link" href="#main-content">تخطَّ إلى المحتوى</a>
+
+  <div id="page-loading" class="page-loader" role="status" aria-live="polite">
+    <span class="spinner" aria-hidden="true"></span>
+    <p id="page-loading-text">جارٍ التحقق من الجلسة...</p>
+  </div>
+
+  <header class="site-header no-print">
+    <div class="container nav-wrap">
+      <a class="brand" href="./dashboard.html" aria-label="بنك أسئلة المعلم">
+        <span class="brand-mark" aria-hidden="true">ب</span>
+        <span class="brand-text">بنك أسئلة المعلم</span>
+      </a>
+
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-label="فتح قائمة التنقل" aria-expanded="false" aria-controls="main-nav">☰</button>
+
+      <nav class="main-nav" id="main-nav" aria-label="التنقل الرئيسي">
+        <a href="./dashboard.html" data-nav="dashboard">لوحة التحكم</a>
+        <a href="./subjects.html" data-nav="subjects">المواد</a>
+        <a href="./questions.html" data-nav="questions">الأسئلة</a>
+        <a href="./exam-builder.html" data-nav="builder">إنشاء اختبار</a>
+        <a href="./exam-view.html" data-nav="exams">الاختبارات</a>
+      </nav>
+
+      <div class="nav-user">
+        <span class="nav-user-name" id="nav-user-name">المعلم</span>
+        <button class="btn btn-ghost btn-sm" id="logout-btn" type="button">تسجيل الخروج</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main-content" class="container page">
+    <section class="page-head no-print">
+      <div>
+        <p class="eyebrow" id="view-eyebrow">الاختبارات المحفوظة</p>
+        <h1 id="view-title">الاختبارات المحفوظة</h1>
+        <p class="muted" id="view-subtitle">افتح أي اختبار لعرضه وطباعته، أو أنشئ اختباراً جديداً.</p>
+      </div>
+      <div class="page-actions">
+        <a class="btn btn-primary" href="./exam-builder.html">إنشاء اختبار جديد</a>
+      </div>
+    </section>
+
+    <section id="exam-error" class="notice notice-error" role="alert" hidden></section>
+
+    <section id="exam-loading" class="card inline-loading" role="status" aria-live="polite" hidden>
+      <span class="spinner" aria-hidden="true"></span>
+      <p>جارٍ تحميل الاختبار...</p>
+    </section>
+
+    <section id="exam-section" hidden>
+      <div class="exam-toolbar no-print" id="exam-toolbar">
+        <a class="btn btn-ghost" href="./exam-view.html">كل الاختبارات</a>
+        <div class="exam-toolbar-actions">
+          <button class="btn btn-outline" id="toggle-answers-btn" type="button" aria-expanded="false" aria-controls="answer-key">إظهار نموذج الإجابة</button>
+          <button class="btn btn-primary" id="print-exam-btn" type="button">طباعة الاختبار</button>
+          <button class="btn btn-ghost" id="print-answers-btn" type="button">طباعة نموذج الإجابة</button>
+        </div>
+      </div>
+
+      <article class="exam-paper" id="exam-paper" aria-live="polite"></article>
+    </section>
+
+    <section id="exams-list-section" class="no-print" hidden>
+      <div class="list-toolbar">
+        <span class="count-pill" id="exams-count">—</span>
+        <span class="muted">الاختبارات المحفوظة لا تتأثر بتعديل أو حذف الأسئلة الأصلية.</span>
+      </div>
+
+      <div id="exams-list" class="exam-list" aria-live="polite">
+        <div class="skeleton-list" aria-hidden="true">
+          <span class="skeleton-line"></span>
+          <span class="skeleton-line"></span>
+          <span class="skeleton-line"></span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer no-print">
+    <div class="container">
+      <p>بنك أسئلة المعلم — نسخة الطالب ونسخة المعلم من الاختبار نفسه.</p>
+    </div>
+  </footer>
+</body>
+</html>

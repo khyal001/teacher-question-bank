@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>الأسئلة | بنك أسئلة المعلم</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./css/style.css">
+  <script type="module" src="./js/questions.js"></script>
+</head>
+<body data-page="questions" class="auth-pending">
+  <a class="skip-link" href="#main-content">تخطَّ إلى المحتوى</a>
+
+  <div id="page-loading" class="page-loader" role="status" aria-live="polite">
+    <span class="spinner" aria-hidden="true"></span>
+    <p id="page-loading-text">جارٍ التحقق من الجلسة...</p>
+  </div>
+
+  <header class="site-header no-print">
+    <div class="container nav-wrap">
+      <a class="brand" href="./dashboard.html" aria-label="بنك أسئلة المعلم">
+        <span class="brand-mark" aria-hidden="true">ب</span>
+        <span class="brand-text">بنك أسئلة المعلم</span>
+      </a>
+
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-label="فتح قائمة التنقل" aria-expanded="false" aria-controls="main-nav">☰</button>
+
+      <nav class="main-nav" id="main-nav" aria-label="التنقل الرئيسي">
+        <a href="./dashboard.html" data-nav="dashboard">لوحة التحكم</a>
+        <a href="./subjects.html" data-nav="subjects">المواد</a>
+        <a href="./questions.html" data-nav="questions">الأسئلة</a>
+        <a href="./exam-builder.html" data-nav="builder">إنشاء اختبار</a>
+        <a href="./exam-view.html" data-nav="exams">الاختبارات</a>
+      </nav>
+
+      <div class="nav-user">
+        <span class="nav-user-name" id="nav-user-name">المعلم</span>
+        <button class="btn btn-ghost btn-sm" id="logout-btn" type="button">تسجيل الخروج</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main-content" class="container page">
+    <section class="page-head">
+      <div>
+        <p class="eyebrow">بنك الأسئلة</p>
+        <h1>الأسئلة</h1>
+        <p class="muted">أضف أسئلتك، صنّفها، وابحث فيها بسهولة.</p>
+      </div>
+      <div class="page-actions no-print">
+        <button class="btn btn-primary" id="add-question-btn" type="button">إضافة سؤال</button>
+      </div>
+    </section>
+
+    <section class="card filters-card no-print" aria-label="فلترة الأسئلة">
+      <form id="filters-form" class="filters-grid">
+        <div class="field">
+          <label for="filter-subject">المادة</label>
+          <select id="filter-subject">
+            <option value="">كل المواد</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="filter-difficulty">الصعوبة</label>
+          <select id="filter-difficulty">
+            <option value="">كل المستويات</option>
+            <option value="easy">سهل</option>
+            <option value="medium">متوسط</option>
+            <option value="hard">صعب</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="filter-type">النوع</label>
+          <select id="filter-type">
+            <option value="">كل الأنواع</option>
+            <option value="mcq">اختيار من متعدد</option>
+            <option value="true_false">صح / خطأ</option>
+            <option value="short">إجابة قصيرة</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="filter-unit">الوحدة</label>
+          <select id="filter-unit">
+            <option value="">كل الوحدات</option>
+          </select>
+        </div>
+
+        <div class="field field-search">
+          <label for="filter-search">بحث في نص السؤال</label>
+          <input id="filter-search" type="search" placeholder="اكتب كلمة للبحث...">
+        </div>
+
+        <div class="filter-actions">
+          <button class="btn btn-ghost" type="button" id="reset-filters">مسح الفلاتر</button>
+        </div>
+      </form>
+    </section>
+
+    <div class="list-toolbar">
+      <span class="count-pill" id="questions-count">—</span>
+      <span class="muted" id="questions-summary">جارٍ تحميل الأسئلة...</span>
+    </div>
+
+    <section id="questions-list" class="question-list" aria-live="polite">
+      <div class="skeleton-list" aria-hidden="true">
+        <span class="skeleton-line"></span>
+        <span class="skeleton-line"></span>
+        <span class="skeleton-line"></span>
+      </div>
+    </section>
+  </main>
+
+  <dialog class="modal modal-lg" id="question-dialog" aria-labelledby="question-dialog-title">
+    <form id="question-form" novalidate>
+      <div class="modal-head">
+        <h2 id="question-dialog-title">إضافة سؤال</h2>
+        <button type="button" class="icon-btn" data-close aria-label="إغلاق">×</button>
+      </div>
+
+      <div class="modal-body">
+        <input type="hidden" id="question-id">
+
+        <div class="form-grid">
+          <div class="field">
+            <label for="question-subject">المادة <span class="req">*</span></label>
+            <select id="question-subject" required></select>
+          </div>
+
+          <div class="field">
+            <span class="label">المستوى / الصف</span>
+            <div class="readonly-value" id="question-grade">—</div>
+          </div>
+
+          <div class="field">
+            <label for="question-unit">الوحدة أو الفصل</label>
+            <input id="question-unit" type="text" maxlength="120" placeholder="مثال: الوحدة الأولى">
+          </div>
+
+          <div class="field">
+            <label for="question-type">نوع السؤال <span class="req">*</span></label>
+            <select id="question-type" required>
+              <option value="mcq">اختيار من متعدد</option>
+              <option value="true_false">صح / خطأ</option>
+              <option value="short">إجابة قصيرة</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="question-difficulty">الصعوبة <span class="req">*</span></label>
+            <select id="question-difficulty" required>
+              <option value="easy">سهل</option>
+              <option value="medium" selected>متوسط</option>
+              <option value="hard">صعب</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="question-points">الدرجة <span class="req">*</span></label>
+            <input id="question-points" type="number" min="0.5" step="0.5" value="1" required>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="question-text">نص السؤال <span class="req">*</span></label>
+          <textarea id="question-text" rows="3" maxlength="4000" placeholder="اكتب نص السؤال هنا..." required></textarea>
+        </div>
+
+        <fieldset class="answer-fieldset" id="mcq-fields">
+          <legend>الخيارات <span class="req">*</span></legend>
+          <p class="form-hint">حدّد الإجابة الصحيحة، ويجب أن يكون عدد الخيارات بين 2 و6 دون تكرار أو فراغ.</p>
+          <div id="options-list" class="options-list"></div>
+          <button type="button" class="btn btn-ghost btn-sm" id="add-option-btn">إضافة خيار</button>
+        </fieldset>
+
+        <fieldset class="answer-fieldset" id="true-false-fields" hidden>
+          <legend>الإجابة الصحيحة <span class="req">*</span></legend>
+          <div class="radio-group">
+            <label class="radio-option">
+              <input type="radio" name="true-false-answer" value="true">
+              <span>صح</span>
+            </label>
+            <label class="radio-option">
+              <input type="radio" name="true-false-answer" value="false">
+              <span>خطأ</span>
+            </label>
+          </div>
+        </fieldset>
+
+        <div class="field" id="short-fields" hidden>
+          <label for="short-answer">الإجابة النموذجية <span class="req">*</span></label>
+          <textarea id="short-answer" rows="2" maxlength="2000" placeholder="اكتب الإجابة النموذجية..."></textarea>
+        </div>
+
+        <p class="form-error" id="question-error" role="alert" hidden></p>
+      </div>
+
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" data-close>إلغاء</button>
+        <button type="submit" class="btn btn-primary" id="save-question-btn">حفظ السؤال</button>
+      </div>
+    </form>
+  </dialog>
+
+  <footer class="site-footer no-print">
+    <div class="container">
+      <p>بنك أسئلة المعلم — كل سؤال يبقى ملكك وحدك.</p>
+    </div>
+  </footer>
+</body>
+</html>
