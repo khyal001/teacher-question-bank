@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg?v=teacher-bank-1">
   <title>المواد | بنك أسئلة المعلم</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,7 +22,7 @@
   <header class="site-header no-print">
     <div class="container nav-wrap">
       <a class="brand" href="./dashboard.html" aria-label="بنك أسئلة المعلم">
-        <span class="brand-mark" aria-hidden="true">ب</span>
+        <img class="brand-mark" src="./favicon.svg?v=teacher-bank-1" alt="" aria-hidden="true">
         <span class="brand-text">بنك أسئلة المعلم</span>
       </a>
 
@@ -30,13 +31,15 @@
       <nav class="main-nav" id="main-nav" aria-label="التنقل الرئيسي">
         <a href="./dashboard.html" data-nav="dashboard">لوحة التحكم</a>
         <a href="./subjects.html" data-nav="subjects">المواد</a>
+        <a href="./groups.html" data-nav="groups">الصفوف والفصول والأقسام</a>
         <a href="./questions.html" data-nav="questions">الأسئلة</a>
         <a href="./exam-builder.html" data-nav="builder">إنشاء اختبار</a>
         <a href="./exam-view.html" data-nav="exams">الاختبارات</a>
+        <a href="./letterheads.html" data-nav="letterheads">الكليشة</a>
       </nav>
 
       <div class="nav-user">
-        <span class="nav-user-name" id="nav-user-name">المعلم</span>
+        <a class="profile-link" href="./profile.html" aria-label="الملف الشخصي"><svg class="user-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 22v-2a8 8 0 0 1 16 0v2"/></svg><span class="nav-user-name" id="nav-user-name">المعلم</span></a>
         <button class="btn btn-ghost btn-sm" id="logout-btn" type="button">تسجيل الخروج</button>
       </div>
     </div>
@@ -46,11 +49,13 @@
     <section class="page-head">
       <div>
         <p class="eyebrow">بنك الأسئلة</p>
-        <h1>المواد والصفوف</h1>
-        <p class="muted">أنشئ المواد التي تدرّسها، وحدّد الصف أو المستوى الإلزامي لكل مادة.</p>
+        <h1>المواد</h1>
+        <p class="muted">أضف المادة مرة واحدة واربطها بالصفوف والفصول والأقسام التي تدرّسها، دون تكرار المادة عند اختلاف الفصل.</p>
       </div>
       <div class="page-actions no-print">
         <button class="btn btn-primary" id="add-subject-btn" type="button">إضافة مادة</button>
+        <a class="btn btn-outline" href="./share-import.html">استيراد حزمة</a>
+        <a class="btn btn-ghost" href="./groups.html">إدارة الصفوف والفصول والأقسام</a>
       </div>
     </section>
 
@@ -74,7 +79,7 @@
     </section>
   </main>
 
-  <dialog class="modal" id="subject-dialog" aria-labelledby="subject-dialog-title">
+  <dialog class="modal modal-lg" id="subject-dialog" aria-labelledby="subject-dialog-title">
     <form id="subject-form" novalidate>
       <div class="modal-head">
         <h2 id="subject-dialog-title">إضافة مادة</h2>
@@ -89,11 +94,17 @@
           <input id="subject-name" type="text" placeholder="مثال: الرياضيات" maxlength="120" required>
         </div>
 
-        <div class="field">
-          <label for="subject-grade">المستوى أو الصف <span class="req">*</span></label>
-          <input id="subject-grade" type="text" placeholder="مثال: الصف الثالث الثانوي" maxlength="120" required aria-required="true">
-          <p class="form-hint">إلزامي، ويظهر في ترويسة الاختبارات.</p>
-        </div>
+        <fieldset class="answer-fieldset">
+          <legend>الصفوف والفصول والأقسام المرتبطة <span class="req">*</span></legend>
+          <p class="form-hint">اختر صف / فصل / قسم واحد على الأقل. يمكنك ربط الصف / الفصل / القسم نفسه بأكثر من مادة.</p>
+          <div id="subject-groups-list" class="group-check-list"></div>
+
+          <div class="inline-add-group">
+            <input id="new-group-name" type="text" maxlength="120" placeholder="مثال: الأول الثانوي - أ، أو قسم الشريعة - المستوى الأول" autocomplete="off">
+            <button type="button" class="btn btn-outline btn-sm" id="add-group-inline-btn">إضافة صف / فصل / قسم</button>
+          </div>
+          <p class="form-error" id="group-inline-error" role="alert" hidden></p>
+        </fieldset>
 
         <p class="form-error" id="subject-error" role="alert" hidden></p>
       </div>
@@ -105,9 +116,60 @@
     </form>
   </dialog>
 
+  <dialog class="modal modal-lg" id="share-dialog" aria-labelledby="share-dialog-title">
+    <div class="modal-head">
+      <h2 id="share-dialog-title">مشاركة أسئلة المادة</h2>
+      <button type="button" class="icon-btn" data-close-share aria-label="إغلاق">×</button>
+    </div>
+
+    <div class="modal-body">
+      <p class="share-subject-name" id="share-subject-name">—</p>
+      <p class="form-hint">
+        يُنشئ الرابط نسخة ثابتة من أسئلة المادة وصفوفها وفصولها وأقسامها. لا يصل المستلم إلى بياناتك الأصلية،
+        والرابط يعمل مرة واحدة فقط ولمدة تحددها.
+      </p>
+
+      <div class="share-create-row">
+        <div class="field">
+          <label for="share-expiry">صلاحية الرابط</label>
+          <select id="share-expiry">
+            <option value="1">يوم واحد</option>
+            <option value="3">3 أيام</option>
+            <option value="7" selected>7 أيام</option>
+            <option value="14">14 يوماً</option>
+            <option value="30">30 يوماً</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" id="create-share-btn" type="button">إنشاء رابط مشاركة</button>
+      </div>
+
+      <div class="share-link-area" id="share-link-area" hidden>
+        <label class="label" for="share-link-input">رابط المشاركة</label>
+        <div class="share-link-box">
+          <input id="share-link-input" type="text" readonly dir="ltr">
+          <button class="btn btn-outline btn-sm" id="copy-share-btn" type="button">نسخ</button>
+        </div>
+        <p class="form-hint" id="share-link-meta"></p>
+        <p class="notice notice-warning">احفظ الرابط الآن؛ لأنه لا يمكن استرجاعه بعد إغلاق النافذة. يمكنك إنشاء رابط جديد في أي وقت.</p>
+      </div>
+
+      <p class="form-error" id="share-error" role="alert" hidden></p>
+
+      <div class="share-list-head">
+        <h3>روابط هذه المادة</h3>
+        <span class="count-pill" id="shares-count">—</span>
+      </div>
+      <div id="shares-list" class="share-list" aria-live="polite"></div>
+    </div>
+
+    <div class="modal-foot">
+      <button type="button" class="btn btn-ghost" data-close-share>إغلاق</button>
+    </div>
+  </dialog>
+
   <footer class="site-footer no-print">
     <div class="container">
-      <p>بنك أسئلة المعلم — كل مادة هي مساحة مستقلة لأسئلتك.</p>
+      <p>بنك أسئلة المعلم — مادة واحدة، وصفوف وفصول وأقسام متعددة، وأسئلة بلا تكرار.</p>
     </div>
   </footer>
 </body>

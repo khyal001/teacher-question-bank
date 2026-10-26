@@ -1,7 +1,10 @@
-// إدارة المواد: إضافة، تعديل، حذف، وعرض عدد الأسئلة.
+import { fetchAll } from './data-utils.js';
+import { createRequestGate } from './data-utils.js';
+// إدارة المواد وربطها بصفوف وفصول وأقسام دراسية متعددة، ومشاركة أسئلتها بأمان.
 import { supabase } from './supabase.js';
 import { initNav, requireAuth } from './auth.js';
 import {
+  copyText,
   formatDate,
   friendlyError,
   h,
@@ -14,17 +17,39 @@ import {
 
 const subjectsList = document.getElementById('subjects-list');
 const subjectsCount = document.getElementById('subjects-count');
+
 const dialog = document.getElementById('subject-dialog');
 const form = document.getElementById('subject-form');
-const nameInput = document.getElementById('subject-name');
-const gradeInput = document.getElementById('subject-grade');
 const idInput = document.getElementById('subject-id');
+const nameInput = document.getElementById('subject-name');
+const groupsList = document.getElementById('subject-groups-list');
+const newGroupInput = document.getElementById('new-group-name');
+const addGroupButton = document.getElementById('add-group-inline-btn');
+const groupInlineError = document.getElementById('group-inline-error');
 const errorBox = document.getElementById('subject-error');
 const dialogTitle = document.getElementById('subject-dialog-title');
 const saveButton = document.getElementById('save-subject-btn');
 
+const shareDialog = document.getElementById('share-dialog');
+const shareSubjectName = document.getElementById('share-subject-name');
+const shareExpiry = document.getElementById('share-expiry');
+const createShareButton = document.getElementById('create-share-btn');
+const shareLinkArea = document.getElementById('share-link-area');
+const shareLinkInput = document.getElementById('share-link-input');
+const copyShareButton = document.getElementById('copy-share-btn');
+const shareLinkMeta = document.getElementById('share-link-meta');
+const shareError = document.getElementById('share-error');
+const sharesList = document.getElementById('shares-list');
+const sharesCount = document.getElementById('shares-count');
+
 let currentUser = null;
+let subjects = [];
+let allGroups = [];
+let subjectGroups = new Map();
 let questionCounts = new Map();
+let currentShareSubject = null;
+const shareRequests = createRequestGate();
+let shareDialogVersion = 0;
 
 init();
 
@@ -40,40 +65,80 @@ async function init() {
 function bindEvents() {
   document.getElementById('add-subject-btn').addEventListener('click', () => openDialog());
   form.addEventListener('submit', handleSubmit);
+  addGroupButton.addEventListener('click', handleInlineGroupAdd);
+  newGroupInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      handleInlineGroupAdd();
+    }
+  });
 
   document.querySelectorAll('[data-close]').forEach((button) => {
     button.addEventListener('click', () => dialog.close());
   });
 
-  // إغلاق عند النقر على الخلفية المعتمة.
   dialog.addEventListener('click', (event) => {
     if (event.target === dialog) dialog.close();
   });
+
+  document.querySelectorAll('[data-close-share]').forEach((button) => {
+    button.addEventListener('click', () => shareDialog.close());
+  });
+
+  shareDialog.addEventListener('click', (event) => {
+    if (event.target === shareDialog) shareDialog.close();
+  });
+
+  shareDialog.addEventListener('close', () => { shareDialogVersion++; shareRequests.next(); });
+  createShareButton.addEventListener('click', createShare);
+  copyShareButton.addEventListener('click', async () => {
+    if (!shareLinkInput.value) return;
+    const copied = await copyText(shareLinkInput.value);
+    toast(copied ? 'تم نسخ رابط المشاركة.' : 'تعذر النسخ تلقائياً. حدّد الرابط وانسخه يدوياً.', copied ? 'success' : 'error');
+  });
 }
 
+// ------------------------------------------------------------
+// تحميل البيانات
+// ------------------------------------------------------------
 async function loadSubjects() {
-  const [subjectsResult, questionsResult] = await Promise.all([
-    supabase
+  const [subjectsResult, groupsResult, linksResult, questionsResult] = await Promise.all([
+    fetchAll(supabase
       .from('subjects')
-      .select('id, name, grade_level, created_at')
+      .select('id, name, created_at')
       .eq('user_id', currentUser.id)
-      .order('created_at', { ascending: false }),
-    supabase
+      .order('created_at', { ascending: false }), ['id']),
+    fetchAll(supabase
+      .from('teaching_groups')
+      .select('id, name')
+      .eq('user_id', currentUser.id)
+      .order('name', { ascending: true }), ['id']),
+    fetchAll(supabase
+      .from('subject_groups')
+      .select('subject_id, group_id')
+      .eq('user_id', currentUser.id), ['subject_id', 'group_id']),
+    fetchAll(supabase
       .from('questions')
       .select('subject_id')
-      .eq('user_id', currentUser.id),
+      .eq('user_id', currentUser.id), ['id']),
   ]);
 
-  if (subjectsResult.error) {
+  const firstError = [subjectsResult, groupsResult, linksResult, questionsResult]
+    .find((result) => result.error)?.error;
+
+  if (firstError) {
     subjectsCount.textContent = '—';
-    renderInlineError(subjectsList, friendlyError(subjectsResult.error));
+    renderInlineError(subjectsList, friendlyError(firstError));
     return;
   }
 
-  if (questionsResult.error) {
-    subjectsCount.textContent = '—';
-    renderInlineError(subjectsList, friendlyError(questionsResult.error));
-    return;
+  subjects = subjectsResult.data || [];
+  allGroups = groupsResult.data || [];
+
+  subjectGroups = new Map();
+  for (const link of linksResult.data || []) {
+    if (!subjectGroups.has(link.subject_id)) subjectGroups.set(link.subject_id, []);
+    subjectGroups.get(link.subject_id).push(link.group_id);
   }
 
   questionCounts = new Map();
@@ -81,17 +146,41 @@ async function loadSubjects() {
     questionCounts.set(row.subject_id, (questionCounts.get(row.subject_id) || 0) + 1);
   }
 
-  renderSubjects(subjectsResult.data || []);
+  renderSubjects();
 }
 
-function renderSubjects(subjects) {
+async function loadAllGroups() {
+  const { data, error } = await fetchAll(supabase
+    .from('teaching_groups')
+    .select('id, name')
+    .eq('user_id', currentUser.id)
+    .order('name', { ascending: true }), ['id']);
+
+  if (error) throw error;
+  allGroups = data || [];
+}
+
+function groupNameById(id) {
+  return allGroups.find((group) => group.id === id)?.name || '';
+}
+
+function groupsOfSubject(subjectId) {
+  return (subjectGroups.get(subjectId) || [])
+    .map((groupId) => allGroups.find((group) => group.id === groupId))
+    .filter(Boolean);
+}
+
+// ------------------------------------------------------------
+// العرض
+// ------------------------------------------------------------
+function renderSubjects() {
   subjectsCount.textContent = `${subjects.length} مادة`;
   subjectsList.replaceChildren();
 
   if (subjects.length === 0) {
     renderEmptyState(subjectsList, {
       title: 'لا توجد مواد حتى الآن',
-      hint: 'ابدأ بإضافة المادة التي تدرّسها، ثم أضف أسئلتها.',
+      hint: 'ابدأ بإضافة المادة التي تدرّسها، واربطها بصف / فصل / قسم واحد على الأقل.',
       action: h(
         'button',
         { class: 'btn btn-primary btn-sm', type: 'button', onclick: () => openDialog() },
@@ -101,99 +190,166 @@ function renderSubjects(subjects) {
     return;
   }
 
-  const table = h(
-    'table',
-    { class: 'data-table' },
-    h(
-      'thead',
-      {},
-      h(
-        'tr',
-        {},
-        h('th', { scope: 'col', text: 'المادة' }),
-        h('th', { scope: 'col', text: 'الصف / المستوى' }),
-        h('th', { scope: 'col', text: 'عدد الأسئلة' }),
-        h('th', { scope: 'col', text: 'تاريخ الإضافة' }),
-        h('th', { scope: 'col', class: 'actions-col', text: 'الإجراءات' }),
-      ),
-    ),
-  );
-
-  const tbody = h('tbody', {});
+  const list = h('div', { class: 'subject-list' });
 
   for (const subject of subjects) {
-    const count = questionCounts.get(subject.id) || 0;
-
-    tbody.appendChild(
-      h(
-        'tr',
-        {},
-        h(
-          'td',
-          { dataset: { label: 'المادة' } },
-          h('strong', { class: 'cell-title', text: subject.name }),
-        ),
-        h('td', { dataset: { label: 'الصف / المستوى' }, text: subject.grade_level || '—' }),
-        h(
-          'td',
-          { dataset: { label: 'عدد الأسئلة' } },
-          h(
-            'a',
-            {
-              class: 'count-link',
-              href: `./questions.html?subject=${encodeURIComponent(subject.id)}`,
-              title: 'عرض أسئلة هذه المادة',
-            },
-            `${count} سؤال`,
-          ),
-        ),
-        h('td', { dataset: { label: 'تاريخ الإضافة' }, text: formatDate(subject.created_at, true) }),
-        h(
-          'td',
-          { dataset: { label: 'الإجراءات' } },
-          h(
-            'div',
-            { class: 'row-actions' },
-            h(
-              'button',
-              {
-                class: 'btn btn-ghost btn-sm',
-                type: 'button',
-                onclick: () => openDialog(subject),
-              },
-              'تعديل',
-            ),
-            h(
-              'button',
-              {
-                class: 'btn btn-danger-ghost btn-sm',
-                type: 'button',
-                onclick: () => confirmDelete(subject, count),
-              },
-              'حذف',
-            ),
-          ),
-        ),
-      ),
-    );
+    list.appendChild(renderSubjectCard(subject));
   }
 
-  table.appendChild(tbody);
-  subjectsList.appendChild(h('div', { class: 'table-wrap' }, table));
+  subjectsList.appendChild(list);
 }
 
+function renderSubjectCard(subject) {
+  const groups = groupsOfSubject(subject.id);
+  const count = questionCounts.get(subject.id) || 0;
+
+  const chips = h('div', { class: 'group-chips' });
+
+  if (groups.length === 0) {
+    chips.appendChild(
+      h('span', { class: 'group-chip is-muted', text: 'بدون صفوف وفصول وأقسام' }),
+    );
+    chips.appendChild(
+      h('span', { class: 'group-chip-hint', text: 'مادة قديمة محفوظة كما هي. أضف صفوف وفصول وأقسام عند تعديلها.' }),
+    );
+  } else {
+    for (const group of groups) {
+      chips.appendChild(h('span', { class: 'group-chip', text: group.name }));
+    }
+  }
+
+  return h(
+    'article',
+    { class: 'subject-card' },
+    h(
+      'div',
+      { class: 'subject-card-main' },
+      h(
+        'div',
+        { class: 'subject-card-head' },
+        h('h3', { class: 'subject-card-title', text: subject.name }),
+        h(
+          'a',
+          {
+            class: 'count-link',
+            href: `./questions.html?subject=${encodeURIComponent(subject.id)}`,
+            title: 'عرض أسئلة هذه المادة',
+          },
+          `${count} سؤال`,
+        ),
+      ),
+      chips,
+      h('p', { class: 'subject-card-date', text: `أُضيفت في ${formatDate(subject.created_at, true)}` }),
+    ),
+    h(
+      'div',
+      { class: 'subject-card-actions' },
+      h('a', { class: 'btn btn-ghost btn-sm', href: `./questions.html?subject=${encodeURIComponent(subject.id)}` }, 'الأسئلة'),
+      h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => openDialog(subject) }, 'تعديل'),
+      h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: () => openShare(subject) }, 'مشاركة'),
+      h('button', { class: 'btn btn-danger-ghost btn-sm', type: 'button', onclick: () => confirmDelete(subject, count) }, 'حذف'),
+    ),
+  );
+}
+
+// ------------------------------------------------------------
+// نموذج المادة والصفوف والفصول والأقسام
+// ------------------------------------------------------------
 function openDialog(subject = null) {
   const isEdit = Boolean(subject);
 
   idInput.value = subject?.id || '';
   nameInput.value = subject?.name || '';
-  gradeInput.value = subject?.grade_level || '';
+  newGroupInput.value = '';
+  showFormError(errorBox, '');
+  showFormError(groupInlineError, '');
+
+  const selected = new Set(subject ? subjectGroups.get(subject.id) || [] : []);
+  renderGroupCheckboxes(selected);
+
   dialogTitle.textContent = isEdit ? 'تعديل المادة' : 'إضافة مادة';
   saveButton.textContent = isEdit ? 'حفظ التعديلات' : 'حفظ المادة';
-  showFormError(errorBox, '');
 
   dialog.showModal();
   nameInput.focus();
+}
+
+function renderGroupCheckboxes(selectedIds = new Set()) {
+  groupsList.replaceChildren();
+
+  if (allGroups.length === 0) {
+    groupsList.appendChild(
+      h('p', { class: 'form-hint', text: 'لا توجد صفوف وفصول وأقسام بعد. أضف صف / فصل / قسم جديد من الأسفل، أو من صفحة الصفوف والفصول والأقسام.' }),
+    );
+    return;
+  }
+
+  if (allGroups.length === 1) {
+    groupsList.appendChild(h('p', { class: 'form-hint', text: `تم اختيار «${allGroups[0].name}» تلقائيًا لأنه الخيار الوحيد المتاح.` }));
+  }
+
+  for (const group of allGroups) {
+    const checkbox = h('input', {
+      type: 'checkbox',
+      value: group.id,
+      name: 'subject-group',
+    });
+    checkbox.checked = selectedIds.has(group.id) || allGroups.length === 1;
+    checkbox.disabled = allGroups.length === 1;
+
+    groupsList.appendChild(
+      h(
+        'label',
+        { class: 'group-check' },
+        checkbox,
+        h('span', { class: 'group-check-name', text: group.name }),
+      ),
+    );
+  }
+}
+
+function checkedGroupIds() {
+  return Array.from(groupsList.querySelectorAll('input[name="subject-group"]:checked')).map(
+    (input) => input.value,
+  );
+}
+
+async function handleInlineGroupAdd() {
+  showFormError(groupInlineError, '');
+
+  const name = newGroupInput.value.trim();
+  if (!name) {
+    showFormError(groupInlineError, 'اكتب اسم الصف / الفصل / القسم الجديد أولاً.');
+    newGroupInput.focus();
+    return;
+  }
+
+  const selected = new Set(checkedGroupIds());
+  setButtonBusy(addGroupButton, true, 'جارٍ الإضافة...');
+
+  try {
+    const { data, error } = await supabase
+      .from('teaching_groups')
+      .insert({ name })
+      .select('id')
+      .single();
+
+    if (error) throw error;
+
+    await loadAllGroups();
+    selected.add(data.id);
+    renderGroupCheckboxes(selected);
+    newGroupInput.value = '';
+    toast('تمت الإضافة والتحديد. احفظ المادة لتثبيت الربط.');
+  } catch (error) {
+    const message = String(error?.code || '') === '23505'
+      ? 'يوجد صف / فصل / قسم بالاسم نفسه. اختر اسمًا مختلفاً.'
+      : friendlyError(error);
+    showFormError(groupInlineError, message);
+  } finally {
+    setButtonBusy(addGroupButton, false);
+    addGroupButton.textContent = 'إضافة صف / فصل / قسم';
+  }
 }
 
 async function handleSubmit(event) {
@@ -201,8 +357,8 @@ async function handleSubmit(event) {
   showFormError(errorBox, '');
 
   const name = nameInput.value.trim();
-  const grade = gradeInput.value.trim();
-  const editingId = idInput.value;
+  const editingId = idInput.value || null;
+  const groupIds = checkedGroupIds();
 
   if (!name) {
     showFormError(errorBox, 'اسم المادة مطلوب.');
@@ -210,30 +366,24 @@ async function handleSubmit(event) {
     return;
   }
 
-  if (!grade) {
-    showFormError(errorBox, 'الصف الدراسي مطلوب. أدخل الصف أو المستوى قبل حفظ المادة.');
-    gradeInput.focus();
+  if (groupIds.length === 0) {
+    showFormError(errorBox, 'اختر صف / فصل / قسم واحد على الأقل قبل حفظ المادة.');
     return;
   }
 
   setButtonBusy(saveButton, true, editingId ? 'جارٍ حفظ التعديلات...' : 'جارٍ حفظ المادة...');
 
   try {
-    // لا نرسل user_id إطلاقاً؛ قاعدة البيانات تضبطه من الجلسة.
-    const payload = { name, grade_level: grade };
+    const { error } = await supabase.rpc('save_subject', {
+      p_id: editingId,
+      p_name: name,
+      p_group_ids: groupIds,
+    });
 
-    const result = editingId
-      ? await supabase.from('subjects').update(payload).eq('id', editingId).select('id')
-      : await supabase.from('subjects').insert(payload).select('id');
-
-    if (result.error) throw result.error;
-
-    if (editingId && (!result.data || result.data.length === 0)) {
-      throw new Error('لم يتم العثور على المادة أو لا تملك صلاحية تعديلها.');
-    }
+    if (error) throw error;
 
     dialog.close();
-    toast(editingId ? 'تم حفظ تعديلات المادة.' : 'تمت إضافة المادة بنجاح.');
+    toast(editingId ? 'تم حفظ تعديلات المادة وصفوفها وفصولها وأقسامها.' : 'تمت إضافة المادة بنجاح.');
     await loadSubjects();
   } catch (error) {
     showFormError(errorBox, friendlyError(error));
@@ -244,10 +394,15 @@ async function handleSubmit(event) {
 }
 
 async function confirmDelete(subject, count) {
+  const groups = groupsOfSubject(subject.id);
   const message = [
     `هل تريد حذف مادة «${subject.name}»؟`,
     '',
     `سيتم حذف ${count} سؤالاً تابعة لها من بنك الأسئلة.`,
+    groups.length > 0
+      ? `سيُزال ارتباطها بـ ${groups.length} صف / فصل / قسم، دون حذف الصفوف والفصول والأقسام نفسها.`
+      : 'هذه المادة غير مرتبطة بأي صف / فصل / قسم.',
+    'ستُلغى روابط المشاركة النشطة لهذه المادة تلقائياً.',
     'الاختبارات المحفوظة سابقاً لن تتأثر وستبقى كما هي.',
     '',
     'لا يمكن التراجع عن هذا الإجراء.',
@@ -261,6 +416,166 @@ async function confirmDelete(subject, count) {
 
     toast('تم حذف المادة وأسئلتها من بنك الأسئلة.');
     await loadSubjects();
+  } catch (error) {
+    toast(friendlyError(error), 'error');
+  }
+}
+
+// ------------------------------------------------------------
+// مشاركة آمنة
+// ------------------------------------------------------------
+async function openShare(subject) {
+  shareDialogVersion++;
+  setButtonBusy(createShareButton, false);
+  currentShareSubject = subject;
+  shareSubjectName.textContent = `${subject.name} — ${(questionCounts.get(subject.id) || 0)} سؤال`;
+  shareExpiry.value = '7';
+  shareLinkArea.hidden = true;
+  shareLinkInput.value = '';
+  showFormError(shareError, '');
+  sharesList.replaceChildren();
+  sharesCount.textContent = '—';
+
+  shareDialog.showModal();
+  await loadShares(subject.id);
+}
+
+async function loadShares(subjectId) {
+  const request = shareRequests.next();
+  const { data, error } = await fetchAll(supabase
+    .from('question_share_packages')
+    .select('id, subject_name_snapshot, question_count, created_at, expires_at, revoked_at, used_at')
+    .eq('subject_id', subjectId)
+    .order('created_at', { ascending: false }), ['id']);
+
+  if (!shareRequests.isCurrent(request) || currentShareSubject?.id !== subjectId || !shareDialog.open) return;
+
+  if (error) {
+    sharesCount.textContent = '—';
+    sharesList.replaceChildren(
+      h('p', { class: 'form-error', text: friendlyError(error) }),
+    );
+    return;
+  }
+
+  const shares = data || [];
+  sharesCount.textContent = `${shares.length} رابط`;
+  sharesList.replaceChildren();
+
+  if (shares.length === 0) {
+    sharesList.appendChild(
+      h('p', { class: 'form-hint', text: 'لا توجد روابط مشاركة لهذه المادة بعد.' }),
+    );
+    return;
+  }
+
+  for (const share of shares) {
+    sharesList.appendChild(renderShareRow(share));
+  }
+}
+
+function shareStatus(share) {
+  if (share.used_at) return { label: 'استُخدم', className: 'is-used' };
+  if (share.revoked_at) return { label: 'ملغى', className: 'is-revoked' };
+  if (new Date(share.expires_at).getTime() <= Date.now()) return { label: 'منتهي', className: 'is-expired' };
+  return { label: 'نشط', className: 'is-active' };
+}
+
+function renderShareRow(share) {
+  const status = shareStatus(share);
+  const canRevoke = status.className === 'is-active';
+
+  return h(
+    'article',
+    { class: 'share-row' },
+    h(
+      'div',
+      { class: 'share-row-main' },
+      h(
+        'div',
+        { class: 'share-row-title' },
+        h('span', { class: `status-pill ${status.className}`, text: status.label }),
+        h('strong', { text: `${share.question_count} سؤال` }),
+      ),
+      h(
+        'p',
+        { class: 'share-row-meta' },
+        `أُنشئ في ${formatDate(share.created_at, true)} · ينتهي في ${formatDate(share.expires_at, true)}`,
+      ),
+    ),
+    canRevoke
+      ? h(
+          'button',
+          {
+            class: 'btn btn-danger-ghost btn-sm',
+            type: 'button',
+            onclick: () => revokeShare(share),
+          },
+          'إلغاء الرابط',
+        )
+      : null,
+  );
+}
+
+async function createShare() {
+  if (!currentShareSubject) return;
+
+  showFormError(shareError, '');
+  shareLinkArea.hidden = true;
+  const subjectId = currentShareSubject.id;
+  const dialogVersion = shareDialogVersion;
+  setButtonBusy(createShareButton, true, 'جارٍ إنشاء الرابط...');
+
+  try {
+    const days = Number(shareExpiry.value || 7);
+    const { data, error } = await supabase.rpc('create_question_share', {
+      p_subject_id: subjectId,
+      p_expires_days: days,
+    });
+
+    if (dialogVersion !== shareDialogVersion || currentShareSubject?.id !== subjectId || !shareDialog.open) return;
+    if (error) throw error;
+    if (!data?.token) throw new Error('تعذر إنشاء رابط المشاركة.');
+
+    const url = new URL('./share-import.html', window.location.href);
+    url.search = '';
+    url.hash = `token=${data.token}`;
+
+    shareLinkInput.value = url.href;
+    shareLinkMeta.textContent =
+      `${data.question_count} سؤال · ${data.group_count} صف / فصل / قسم · ينتهي في ${formatDate(data.expires_at, true)}`;
+    shareLinkArea.hidden = false;
+    shareLinkInput.focus();
+    shareLinkInput.select();
+
+    toast('تم إنشاء رابط المشاركة. انسخه الآن.');
+    await loadShares(currentShareSubject.id);
+  } catch (error) {
+    if (dialogVersion === shareDialogVersion && currentShareSubject?.id === subjectId && shareDialog.open) showFormError(shareError, friendlyError(error));
+  } finally {
+    if (dialogVersion === shareDialogVersion) {
+      setButtonBusy(createShareButton, false);
+      createShareButton.textContent = 'إنشاء رابط مشاركة';
+    }
+  }
+}
+
+async function revokeShare(share) {
+  const subjectId = currentShareSubject?.id;
+  if (!window.confirm('هل تريد إلغاء رابط المشاركة؟ لن يعمل بعد الآن، ولا يمكن التراجع.')) return;
+
+  try {
+    const { data, error } = await supabase.rpc('revoke_question_share', {
+      p_share_id: share.id,
+    });
+
+    if (error) throw error;
+    if (data !== true) {
+      throw new Error('تعذر إلغاء الرابط. قد يكون مستخدماً أو ملغى مسبقاً.');
+    }
+
+    toast('تم إلغاء رابط المشاركة.');
+    if (currentShareSubject?.id === subjectId) await loadShares(subjectId);
   } catch (error) {
     toast(friendlyError(error), 'error');
   }

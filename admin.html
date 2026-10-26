@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg?v=teacher-bank-1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>إدارة النظام | بنك أسئلة المعلم</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./css/style.css">
+  <script type="module" src="./js/admin.js"></script>
+</head>
+<body class="auth-pending" data-page="admin">
+  <a class="skip-link" href="#main-content">تخطَّ إلى المحتوى</a>
+  <div id="page-loading" class="page-loader" role="status" aria-live="polite">
+    <span class="spinner" aria-hidden="true"></span>
+    <p id="page-loading-text">جارٍ التحقق من الجلسة...</p>
+  </div>
+  <header class="site-header">
+    <div class="container nav-wrap">
+      <a class="brand" href="./dashboard.html"><img class="brand-mark" src="./favicon.svg?v=teacher-bank-1" alt="" aria-hidden="true"><span class="brand-text">بنك أسئلة المعلم</span></a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-label="فتح قائمة التنقل" aria-expanded="false" aria-controls="main-nav">☰</button>
+      <nav class="main-nav" id="main-nav" aria-label="التنقل الرئيسي"><a href="./dashboard.html">لوحة المعلم</a></nav>
+      <div class="nav-user"><a class="profile-link" href="./profile.html" aria-label="الملف الشخصي"><svg class="user-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 22v-2a8 8 0 0 1 16 0v2"/></svg><span class="nav-user-name" id="nav-user-name"></span></a><button class="btn btn-ghost btn-sm" id="logout-btn" type="button">تسجيل الخروج</button></div>
+    </div>
+  </header>
+  <main id="main-content" class="container page">
+    <p class="notice" id="admin-status" role="status">جارٍ التحقق من صلاحية الإدارة...</p>
+    <section id="admin-denied" class="card" hidden>
+      <h1>غير مصرح لك بالدخول</h1><p>هذه الصفحة مخصصة لإدارة النظام.</p>
+      <a class="btn btn-primary" href="./dashboard.html">العودة إلى لوحة التحكم</a>
+    </section>
+    <div id="admin-content" hidden>
+      <section class="page-head"><div><p class="eyebrow">صاحب النظام</p><h1>إدارة النظام</h1><p class="muted">إحصاءات عامة ومتابعة حسابات المعلمين.</p></div><button class="btn btn-outline" id="admin-refresh" type="button">تحديث</button></section>
+      <div class="stats-grid admin-stats" id="admin-stats"></div>
+      <section class="card">
+        <h2>المعلمون</h2>
+        <form class="admin-filters" id="admin-filters">
+          <div class="field"><label for="admin-search">البحث بالاسم أو البريد</label><input id="admin-search" type="search" maxlength="200" autocomplete="off" placeholder="اسم المعلم أو بريده الإلكتروني"></div>
+          <div class="field"><label for="admin-sort">الترتيب</label><select id="admin-sort"><option value="newest">الأحدث تسجيلًا</option><option value="questions">الأكثر أسئلة</option><option value="exams">الأكثر اختبارات</option></select></div>
+        </form>
+        <p class="muted" id="admin-count" aria-live="polite"></p>
+        <div id="admin-teachers" aria-live="polite"></div>
+        <div class="admin-pagination"><button class="btn btn-outline btn-sm" id="admin-prev" type="button" disabled>السابق</button><span id="admin-page"></span><button class="btn btn-outline btn-sm" id="admin-next" type="button" disabled>التالي</button></div>
+      </section>
+    </div>
+  </main>
+  <footer class="site-footer"><div class="container"><p>بنك أسئلة المعلم</p></div></footer>
+</body>
+</html>

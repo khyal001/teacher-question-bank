@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg?v=teacher-bank-1">
   <title>الأسئلة | بنك أسئلة المعلم</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,7 +22,7 @@
   <header class="site-header no-print">
     <div class="container nav-wrap">
       <a class="brand" href="./dashboard.html" aria-label="بنك أسئلة المعلم">
-        <span class="brand-mark" aria-hidden="true">ب</span>
+        <img class="brand-mark" src="./favicon.svg?v=teacher-bank-1" alt="" aria-hidden="true">
         <span class="brand-text">بنك أسئلة المعلم</span>
       </a>
 
@@ -30,13 +31,15 @@
       <nav class="main-nav" id="main-nav" aria-label="التنقل الرئيسي">
         <a href="./dashboard.html" data-nav="dashboard">لوحة التحكم</a>
         <a href="./subjects.html" data-nav="subjects">المواد</a>
+        <a href="./groups.html" data-nav="groups">الصفوف والفصول والأقسام</a>
         <a href="./questions.html" data-nav="questions">الأسئلة</a>
         <a href="./exam-builder.html" data-nav="builder">إنشاء اختبار</a>
         <a href="./exam-view.html" data-nav="exams">الاختبارات</a>
+        <a href="./letterheads.html" data-nav="letterheads">الكليشة</a>
       </nav>
 
       <div class="nav-user">
-        <span class="nav-user-name" id="nav-user-name">المعلم</span>
+        <a class="profile-link" href="./profile.html" aria-label="الملف الشخصي"><svg class="user-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 22v-2a8 8 0 0 1 16 0v2"/></svg><span class="nav-user-name" id="nav-user-name">المعلم</span></a>
         <button class="btn btn-ghost btn-sm" id="logout-btn" type="button">تسجيل الخروج</button>
       </div>
     </div>
@@ -47,7 +50,7 @@
       <div>
         <p class="eyebrow">بنك الأسئلة</p>
         <h1>الأسئلة</h1>
-        <p class="muted">أضف أسئلتك، صنّفها، وابحث فيها بسهولة.</p>
+        <p class="muted">أضف أسئلتك، وحدّد لكل سؤال إن كان يخص جميع صفوف وفصول وأقسام المادة أو صفوف وفصول وأقسام محددة منها.</p>
       </div>
       <div class="page-actions no-print">
         <button class="btn btn-primary" id="add-question-btn" type="button">إضافة سؤال</button>
@@ -84,14 +87,14 @@
         </div>
 
         <div class="field">
-          <label for="filter-unit">الوحدة</label>
+          <label for="filter-unit">الوحدة / الباب / الفصل</label>
           <select id="filter-unit">
             <option value="">كل الوحدات</option>
           </select>
         </div>
 
         <div class="field field-search">
-          <label for="filter-search">بحث في نص السؤال</label>
+          <label for="filter-search">بحث في السؤال أو الوحدة / الباب / الفصل</label>
           <input id="filter-search" type="search" placeholder="اكتب كلمة للبحث...">
         </div>
 
@@ -113,6 +116,7 @@
         <span class="skeleton-line"></span>
       </div>
     </section>
+    <div class="admin-pagination" aria-label="صفحات الأسئلة"><button class="btn btn-outline btn-sm" id="questions-prev" type="button" disabled>السابق</button><span id="questions-page" aria-live="polite"></span><button class="btn btn-outline btn-sm" id="questions-next" type="button" disabled>التالي</button></div>
   </main>
 
   <dialog class="modal modal-lg" id="question-dialog" aria-labelledby="question-dialog-title">
@@ -132,13 +136,9 @@
           </div>
 
           <div class="field">
-            <span class="label">المستوى / الصف</span>
-            <div class="readonly-value" id="question-grade">—</div>
-          </div>
-
-          <div class="field">
-            <label for="question-unit">الوحدة أو الفصل</label>
-            <input id="question-unit" type="text" maxlength="120" placeholder="مثال: الوحدة الأولى">
+            <label for="question-unit">الوحدة / الباب / الفصل (اختياري)</label>
+            <input id="question-unit" aria-describedby="question-unit-help" type="text" maxlength="120" placeholder="مثال: الوحدة الأولى أو باب الجبر أو Chapter 2">
+            <p class="form-hint" id="question-unit-help">اختياري؛ لتنظيم أسئلة المادة وتسهيل البحث والتصفية.</p>
           </div>
 
           <div class="field">
@@ -158,12 +158,26 @@
               <option value="hard">صعب</option>
             </select>
           </div>
-
-          <div class="field">
-            <label for="question-points">الدرجة <span class="req">*</span></label>
-            <input id="question-points" type="number" min="0.5" step="0.5" value="1" required>
-          </div>
         </div>
+
+        <fieldset class="answer-fieldset group-scope-fieldset">
+          <legend>نطاق الصفوف والفصول والأقسام <span class="req">*</span></legend>
+          <p class="form-hint">درجة السؤال تُحدد لاحقاً عند إنشاء الاختبار، وليست جزءاً من بنك الأسئلة.</p>
+
+          <div class="radio-group">
+            <label class="radio-option">
+              <input type="radio" name="group-scope" value="all" checked>
+              <span>جميع صفوف وفصول وأقسام المادة</span>
+            </label>
+            <label class="radio-option">
+              <input type="radio" name="group-scope" value="selected">
+              <span>صفوف وفصول وأقسام محددة</span>
+            </label>
+          </div>
+
+          <div class="group-check-list" id="question-groups" hidden></div>
+          <p class="form-hint" id="question-groups-hint">يشمل هذا الخيار أي صف / فصل / قسم يضاف إلى المادة لاحقاً.</p>
+        </fieldset>
 
         <div class="field">
           <label for="question-text">نص السؤال <span class="req">*</span></label>
@@ -208,7 +222,7 @@
 
   <footer class="site-footer no-print">
     <div class="container">
-      <p>بنك أسئلة المعلم — كل سؤال يبقى ملكك وحدك.</p>
+      <p>بنك أسئلة المعلم — كل سؤال يبقى ملكك وحدك، والدرجات تُحدد عند بناء الاختبار.</p>
     </div>
   </footer>
 </body>

@@ -1,3 +1,4 @@
+import { fetchAll } from './data-utils.js';
 // لوحة التحكم: إحصائيات سريعة وآخر الأسئلة.
 import { supabase } from './supabase.js';
 import { initNav, requireAuth, displayName } from './auth.js';
@@ -5,7 +6,6 @@ import {
   DIFFICULTY_LABELS,
   TYPE_LABELS,
   formatDate,
-  formatPoints,
   friendlyError,
   h,
   renderEmptyState,
@@ -31,7 +31,7 @@ async function loadStats(user) {
     supabase.from('subjects').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
     supabase.from('questions').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
     supabase.from('exams').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
-    supabase.from('questions').select('difficulty').eq('user_id', user.id),
+    fetchAll(supabase.from('questions').select('difficulty').eq('user_id', user.id), ['id']),
   ]);
 
   const firstError = [subjectsResult, questionsResult, examsResult, difficultyResult]
@@ -65,7 +65,7 @@ async function loadStats(user) {
 async function loadLatestQuestions() {
   const { data, error } = await supabase
     .from('questions')
-    .select('id, question_text, type, difficulty, points, created_at, subjects(name, grade_level)')
+    .select('id, question_text, type, difficulty, created_at, subjects(name)')
     .order('created_at', { ascending: false })
     .limit(5);
 
@@ -97,13 +97,12 @@ async function loadLatestQuestions() {
           { class: 'latest-meta' },
           h('span', { class: `badge badge-${question.difficulty}`, text: DIFFICULTY_LABELS[question.difficulty] || question.difficulty }),
           h('span', { class: 'badge badge-type', text: TYPE_LABELS[question.type] || question.type }),
-          h('span', { class: 'latest-points', text: `${formatPoints(question.points)} درجة` }),
         ),
         h('p', { class: 'latest-text', text: question.question_text }),
         h(
           'div',
           { class: 'latest-foot' },
-          h('span', { text: subject ? `${subject.name}${subject.grade_level ? ` — ${subject.grade_level}` : ''}` : 'مادة محذوفة' }),
+          h('span', { text: subject ? subject.name : 'مادة محذوفة' }),
           h('span', { text: formatDate(question.created_at, true) }),
         ),
       ),

@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg?v=teacher-bank-1">
   <title>إنشاء اختبار | بنك أسئلة المعلم</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,7 +22,7 @@
   <header class="site-header no-print">
     <div class="container nav-wrap">
       <a class="brand" href="./dashboard.html" aria-label="بنك أسئلة المعلم">
-        <span class="brand-mark" aria-hidden="true">ب</span>
+        <img class="brand-mark" src="./favicon.svg?v=teacher-bank-1" alt="" aria-hidden="true">
         <span class="brand-text">بنك أسئلة المعلم</span>
       </a>
 
@@ -30,13 +31,15 @@
       <nav class="main-nav" id="main-nav" aria-label="التنقل الرئيسي">
         <a href="./dashboard.html" data-nav="dashboard">لوحة التحكم</a>
         <a href="./subjects.html" data-nav="subjects">المواد</a>
+        <a href="./groups.html" data-nav="groups">الصفوف والفصول والأقسام</a>
         <a href="./questions.html" data-nav="questions">الأسئلة</a>
         <a href="./exam-builder.html" data-nav="builder">إنشاء اختبار</a>
         <a href="./exam-view.html" data-nav="exams">الاختبارات</a>
+        <a href="./letterheads.html" data-nav="letterheads">الكليشة</a>
       </nav>
 
       <div class="nav-user">
-        <span class="nav-user-name" id="nav-user-name">المعلم</span>
+        <a class="profile-link" href="./profile.html" aria-label="الملف الشخصي"><svg class="user-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 22v-2a8 8 0 0 1 16 0v2"/></svg><span class="nav-user-name" id="nav-user-name">المعلم</span></a>
         <button class="btn btn-ghost btn-sm" id="logout-btn" type="button">تسجيل الخروج</button>
       </div>
     </div>
@@ -46,8 +49,8 @@
     <section class="page-head">
       <div>
         <p class="eyebrow">مولّد الاختبارات</p>
-        <h1>إنشاء اختبار عشوائي</h1>
-        <p class="muted">اختر المادة وعدد الأسئلة من كل مستوى، ثم راجع المعاينة قبل الحفظ.</p>
+        <h1>إنشاء اختبار</h1>
+        <p class="muted">اختر المادة والصفوف والفصول والأقسام، وحدّد إجمالي الدرجات وأعداد الأسئلة، ثم راجع التوزيع قبل الحفظ.</p>
       </div>
       <div class="page-actions no-print">
         <a class="btn btn-ghost" href="./exam-view.html">الاختبارات المحفوظة</a>
@@ -62,21 +65,41 @@
 
         <form id="exam-form" class="builder-form" novalidate>
           <div class="field">
+            <label for="exam-title">عنوان الاختبار <span class="req">*</span></label>
+            <input id="exam-title" type="text" maxlength="160" placeholder="مثال: اختبار منتصف الفصل الأول" required>
+          </div>
+
+          <div class="field">
             <label for="exam-subject">المادة <span class="req">*</span></label>
             <select id="exam-subject" required>
               <option value="">اختر المادة</option>
             </select>
           </div>
 
+          <fieldset class="count-fieldset" id="exam-groups-fieldset">
+            <legend>الصفوف والفصول والأقسام المستهدفة</legend>
+            <div class="group-check-list" id="exam-groups" tabindex="-1"></div>
+            <p class="availability-note" id="exam-groups-note">اختر المادة أولاً.</p>
+          </fieldset>
+
           <div class="field">
-            <label for="exam-title">عنوان الاختبار <span class="req">*</span></label>
-            <input id="exam-title" type="text" maxlength="160" placeholder="مثال: اختبار منتصف الفصل الأول" required>
+            <label for="exam-letterhead">قالب الكليشة</label>
+            <select id="exam-letterhead">
+              <option value="">بدون كليشة مخصصة</option>
+            </select>
+            <p class="form-hint">يمكنك إدارة القوالب من <a href="./letterheads.html">صفحة الكليشة</a>. تُحفظ نسخة من الكليشة داخل الاختبار.</p>
           </div>
 
           <div class="field">
-            <label for="exam-duration">المدة بالدقائق</label>
-            <input id="exam-duration" type="number" min="1" step="1" placeholder="مثال: 45">
-            <p class="form-hint">اختياري.</p>
+            <label for="exam-total-points">إجمالي درجات الاختبار <span class="req">*</span></label>
+            <input id="exam-total-points" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="مثال: 20" required>
+            <p class="form-hint">توزّع الدرجات تلقائياً على الأسئلة بعد التوليد، ويجب أن يساوي مجموعها هذا الرقم قبل الحفظ.</p>
+          </div>
+
+          <div class="field">
+            <label for="exam-closing">العبارة الختامية</label>
+            <textarea id="exam-closing" rows="2" maxlength="1000" placeholder="مثال: مع تمنياتي لكم بالتوفيق."></textarea>
+            <p class="form-hint">تظهر هذه العبارة بعد آخر سؤال في الاختبار. الحقل اختياري ويمكن تركه فارغًا.</p>
           </div>
 
           <fieldset class="count-fieldset">
@@ -102,7 +125,7 @@
               </div>
             </div>
 
-            <p class="availability-note" id="availability-note">اختر المادة لعرض الأسئلة المتاحة.</p>
+            <p class="availability-note" id="availability-note">اختر المادة والصفوف والفصول والأقسام لعرض الأسئلة المتاحة.</p>
           </fieldset>
 
           <label class="check-option">
@@ -115,7 +138,7 @@
 
           <p class="form-error" id="builder-error" role="alert" hidden></p>
 
-          <button class="btn btn-primary btn-block" id="generate-btn" type="submit">توليد المعاينة</button>
+          <button class="btn btn-primary btn-block" id="generate-btn" type="submit" disabled>توليد المعاينة</button>
         </form>
       </section>
 
@@ -129,12 +152,13 @@
           <div class="empty-state">
             <div class="empty-icon" aria-hidden="true">✦</div>
             <h3>لم يتم توليد اختبار بعد</h3>
-            <p>اختر المادة وعدد الأسئلة، ثم اضغط «توليد المعاينة».</p>
+            <p>اختر المادة والصفوف والفصول والأقسام وإجمالي الدرجات، ثم اضغط «توليد المعاينة».</p>
           </div>
         </div>
 
         <div class="preview-actions" id="preview-actions" hidden>
           <button class="btn btn-primary" id="save-exam-btn" type="button">حفظ الاختبار</button>
+          <button class="btn btn-outline" id="redistribute-btn" type="button">توزيع الدرجات بالتساوي</button>
           <button class="btn btn-ghost" id="regenerate-btn" type="button">إعادة التوليد</button>
           <button class="btn btn-ghost" id="cancel-preview-btn" type="button">إلغاء المعاينة</button>
         </div>
@@ -144,7 +168,7 @@
 
   <footer class="site-footer no-print">
     <div class="container">
-      <p>بنك أسئلة المعلم — اختبارك يُحفظ بنسخة ثابتة لا تتأثر بتعديلات لاحقة.</p>
+      <p>بنك أسئلة المعلم — درجات على مقاس اختبارك، وتوزيع دقيق قبل الحفظ.</p>
     </div>
   </footer>
 </body>

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg?v=teacher-bank-1">
+  <title>استيراد حزمة أسئلة | بنك أسئلة المعلم</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./css/style.css">
+  <script type="module" src="./js/share-import.js"></script>
+</head>
+<body data-page="share-import" class="auth-pending">
+  <a class="skip-link" href="#main-content">تخطَّ إلى المحتوى</a>
+
+  <div id="page-loading" class="page-loader" role="status" aria-live="polite">
+    <span class="spinner" aria-hidden="true"></span>
+    <p id="page-loading-text">جارٍ التحقق من الجلسة...</p>
+  </div>
+
+  <header class="site-header no-print">
+    <div class="container nav-wrap">
+      <a class="brand" href="./dashboard.html" aria-label="بنك أسئلة المعلم">
+        <img class="brand-mark" src="./favicon.svg?v=teacher-bank-1" alt="" aria-hidden="true">
+        <span class="brand-text">بنك أسئلة المعلم</span>
+      </a>
+
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-label="فتح قائمة التنقل" aria-expanded="false" aria-controls="main-nav">☰</button>
+
+      <nav class="main-nav" id="main-nav" aria-label="التنقل الرئيسي">
+        <a href="./dashboard.html" data-nav="dashboard">لوحة التحكم</a>
+        <a href="./subjects.html" data-nav="subjects">المواد</a>
+        <a href="./groups.html" data-nav="groups">الصفوف والفصول والأقسام</a>
+        <a href="./questions.html" data-nav="questions">الأسئلة</a>
+        <a href="./exam-builder.html" data-nav="builder">إنشاء اختبار</a>
+        <a href="./exam-view.html" data-nav="exams">الاختبارات</a>
+        <a href="./letterheads.html" data-nav="letterheads">الكليشة</a>
+      </nav>
+
+      <div class="nav-user">
+        <a class="profile-link" href="./profile.html" aria-label="الملف الشخصي"><svg class="user-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 22v-2a8 8 0 0 1 16 0v2"/></svg><span class="nav-user-name" id="nav-user-name">المعلم</span></a>
+        <button class="btn btn-ghost btn-sm" id="logout-btn" type="button">تسجيل الخروج</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main-content" class="container page">
+    <section class="page-head">
+      <div>
+        <p class="eyebrow">مشاركة آمنة</p>
+        <h1>استيراد حزمة أسئلة</h1>
+        <p class="muted">تُنسخ أسئلة المادة إلى حسابك بعد مراجعتها، دون أي وصول مباشر إلى بيانات المرسل.</p>
+      </div>
+      <div class="page-actions no-print">
+        <a class="btn btn-ghost" href="./subjects.html">العودة إلى المواد</a>
+      </div>
+    </section>
+
+    <div class="notice notice-info no-print">
+      <strong>كيف تعمل المشاركة؟</strong>
+      <span>الرابط يحتوي على مفتاح سري لمرة واحدة، ولا يحتوي على معرّفات حساب المرسل. عند الاستيراد تُنشأ نسخة جديدة من المادة والصفوف والفصول والأقسام والأسئلة داخل حسابك.</span>
+    </div>
+
+    <section class="card token-gate" id="token-gate" aria-labelledby="token-gate-title">
+      <div class="card-head">
+        <h2 id="token-gate-title">أدخل رابط المشاركة</h2>
+      </div>
+
+      <form id="token-form" class="inline-form" novalidate>
+        <div class="field inline-form-field">
+          <label for="token-input">رابط المشاركة أو المفتاح</label>
+          <input id="token-input" type="text" dir="ltr" placeholder="https://.../share-import.html#token=... أو المفتاح فقط" autocomplete="off">
+        </div>
+        <button class="btn btn-primary" id="token-submit" type="submit">عرض الحزمة</button>
+      </form>
+      <p class="form-error" id="token-error" role="alert" hidden></p>
+    </section>
+
+    <section id="preview-section" hidden>
+      <div class="card share-preview-card">
+        <div class="card-head">
+          <div>
+            <p class="eyebrow">الحزمة الجاهزة</p>
+            <h2 id="preview-subject-name">—</h2>
+          </div>
+          <span class="count-pill" id="preview-question-count">—</span>
+        </div>
+
+        <div class="share-preview-meta" id="preview-meta"></div>
+
+        <div class="notice notice-warning">
+          <strong>قبل الاستيراد:</strong>
+          <span>راجع اسم المادة وربط الصفوف والفصول والأقسام. الرابط يُستهلك مرة واحدة بعد نجاح الاستيراد، ولا يمكن استخدامه مرة أخرى.</span>
+        </div>
+
+        <div class="field">
+          <label for="import-subject-name">اسم المادة في حسابك <span class="req">*</span></label>
+          <input id="import-subject-name" type="text" maxlength="120" required>
+        </div>
+
+        <div class="mapping-section" id="mapping-section">
+          <div class="mapping-head">
+            <h3>ربط الصفوف والفصول والأقسام</h3>
+            <p class="form-hint">
+              لكل صف / فصل / قسم في الحزمة: اربطه بصف / فصل / قسم موجود، أو أنشئ صف / فصل / قسم جديد بالاسم نفسه، أو أجّل ربطها.
+              الأسئلة المحددة لصف / فصل / قسم مؤجل ستبقى بلا صف / فصل / قسم حتى تعدّلها لاحقاً.
+            </p>
+          </div>
+          <div id="mapping-list" class="mapping-list"></div>
+        </div>
+
+        <p class="form-error" id="import-error" role="alert" hidden></p>
+
+        <div class="share-import-actions">
+          <button class="btn btn-primary" id="import-btn" type="button">استيراد الحزمة إلى حسابي</button>
+          <a class="btn btn-ghost" href="./subjects.html">إلغاء</a>
+        </div>
+      </div>
+    </section>
+
+    <section id="import-empty" class="card" hidden>
+      <div class="empty-state">
+        <div class="empty-icon" aria-hidden="true">✦</div>
+        <h3>لا توجد حزمة معروضة</h3>
+        <p>الصق رابط المشاركة في الحقل أعلاه، أو اطلب رابطاً جديداً من معلم آخر.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer no-print">
+    <div class="container">
+      <p>بنك أسئلة المعلم — استيراد بنسخة، لا وصول إلى بيانات الآخرين.</p>
+    </div>
+  </footer>
+</body>
+</html>

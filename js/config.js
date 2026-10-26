@@ -3,7 +3,7 @@
 // القيم من: Supabase Dashboard > Project Settings > API
 //
 // ملاحظة: Publishable key مفتاح عام مخصص للواجهة، وليس secret.
-// لا تضع service_role أو Secret key هنا إطلاقاً.
+// لا تضع أي مفتاح إداري سري أو Secret key هنا إطلاقاً.
 // ============================================================
 
 export const SUPABASE_URL = 'https://gjkuyecnyhlbvaftuwel.supabase.co';

@@ -1,5 +1,5 @@
 // عميل Supabase واحد مشترك لكل صفحات الموقع.
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/+esm';
 import { SUPABASE_URL, SUPABASE_ANON_KEY, isSupabaseConfigured } from './config.js';
 
 export { isSupabaseConfigured };

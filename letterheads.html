@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg?v=teacher-bank-1">
+  <title>قوالب الكليشة | بنك أسئلة المعلم</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./css/style.css">
+  <script type="module" src="./js/letterheads.js"></script>
+</head>
+<body data-page="letterheads" class="auth-pending">
+  <a class="skip-link" href="#main-content">تخطَّ إلى المحتوى</a>
+
+  <div id="page-loading" class="page-loader" role="status" aria-live="polite">
+    <span class="spinner" aria-hidden="true"></span>
+    <p id="page-loading-text">جارٍ التحقق من الجلسة...</p>
+  </div>
+
+  <header class="site-header no-print">
+    <div class="container nav-wrap">
+      <a class="brand" href="./dashboard.html" aria-label="بنك أسئلة المعلم">
+        <img class="brand-mark" src="./favicon.svg?v=teacher-bank-1" alt="" aria-hidden="true">
+        <span class="brand-text">بنك أسئلة المعلم</span>
+      </a>
+
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-label="فتح قائمة التنقل" aria-expanded="false" aria-controls="main-nav">☰</button>
+
+      <nav class="main-nav" id="main-nav" aria-label="التنقل الرئيسي">
+        <a href="./dashboard.html" data-nav="dashboard">لوحة التحكم</a>
+        <a href="./subjects.html" data-nav="subjects">المواد</a>
+        <a href="./groups.html" data-nav="groups">الصفوف والفصول والأقسام</a>
+        <a href="./questions.html" data-nav="questions">الأسئلة</a>
+        <a href="./exam-builder.html" data-nav="builder">إنشاء اختبار</a>
+        <a href="./exam-view.html" data-nav="exams">الاختبارات</a>
+        <a href="./letterheads.html" data-nav="letterheads">الكليشة</a>
+      </nav>
+
+      <div class="nav-user">
+        <a class="profile-link" href="./profile.html" aria-label="الملف الشخصي"><svg class="user-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 22v-2a8 8 0 0 1 16 0v2"/></svg><span class="nav-user-name" id="nav-user-name">المعلم</span></a>
+        <button class="btn btn-ghost btn-sm" id="logout-btn" type="button">تسجيل الخروج</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main-content" class="container page">
+    <section class="page-head">
+      <div>
+        <p class="eyebrow">الهوية البصرية</p>
+        <h1>قوالب الكليشة</h1>
+        <p class="muted">أنشئ ترويسات جاهزة للمدارس والكليات والجامعات، مع شعار خاص لكل قالب.</p>
+      </div>
+      <div class="page-actions no-print">
+        <button class="btn btn-primary" id="add-letterhead-btn" type="button">إضافة قالب</button>
+      </div>
+    </section>
+
+    <div class="notice notice-info no-print">
+      <strong>الشعارات خاصة:</strong>
+      <span>تُحفظ الشعارات في مخزن Supabase خاص، ولا يستطيع أي معلم آخر قراءتها. يُحفظ في الاختبار لقطة من بيانات الكليشة وقت الإنشاء.</span>
+    </div>
+
+    <section class="card list-card" aria-labelledby="letterheads-title">
+      <div class="card-head">
+        <h2 id="letterheads-title">القوالب</h2>
+        <span class="count-pill" id="letterheads-count">—</span>
+      </div>
+      <div id="letterheads-list" aria-live="polite">
+        <div class="skeleton-list" aria-hidden="true">
+          <span class="skeleton-line"></span>
+          <span class="skeleton-line"></span>
+          <span class="skeleton-line"></span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <dialog class="modal letterhead-editor-modal" id="letterhead-dialog" aria-labelledby="letterhead-dialog-title">
+    <form id="letterhead-form" novalidate>
+      <div class="modal-head">
+        <h2 id="letterhead-dialog-title">إضافة قالب كليشة</h2>
+        <button type="button" class="icon-btn" data-close aria-label="إغلاق">×</button>
+      </div>
+
+      <div class="modal-body letterhead-editor-grid">
+        <div class="letterhead-editor-fields">
+          <input type="hidden" id="letterhead-id">
+          <div class="field"><label for="letterhead-name">اسم القالب <span class="req">*</span></label><input id="letterhead-name" type="text" maxlength="120" required><p class="form-hint">اسم داخلي لا يظهر في الاختبار.</p></div>
+          <div class="field"><label for="letterhead-entity">الجهة العليا</label><input id="letterhead-entity" type="text" maxlength="160" placeholder="مثال: وزارة التعليم"></div>
+          <div class="field"><label for="letterhead-school">الجهة التعليمية</label><input id="letterhead-school" type="text" maxlength="500" placeholder="مدرسة أو جامعة أو كلية أو معهد"></div>
+          <div class="field"><label for="letterhead-department">القسم / البرنامج (اختياري)</label><input id="letterhead-department" type="text" maxlength="160"></div>
+          <div class="field"><label for="letterhead-extra">سطر إضافي (اختياري)</label><input id="letterhead-extra" type="text" maxlength="240"></div>
+          <fieldset class="answer-fieldset">
+            <legend>شعار الكليشة</legend>
+            <p class="form-hint">PNG أو JPG أو WebP، بحد أقصى 2 ميجابايت. يُحفظ في مخزن خاص بحسابك.</p>
+            <div class="logo-editor">
+              <div class="logo-preview"><span class="logo-placeholder" id="logo-placeholder">شعار</span><img id="logo-image" alt="معاينة الشعار" hidden></div>
+              <div class="logo-editor-actions"><label class="btn btn-outline btn-sm file-button" for="letterhead-logo">اختيار شعار</label><input id="letterhead-logo" class="visually-hidden" type="file" accept="image/png,image/jpeg,image/webp"><button class="btn btn-danger-ghost btn-sm" id="remove-logo-btn" type="button" hidden>إزالة الشعار الحالي</button><p class="form-hint" id="logo-status">لم يتم اختيار شعار.</p></div>
+            </div>
+          </fieldset>
+          <fieldset class="answer-fieldset">
+            <legend>مواضع عناصر الرأس</legend>
+            <p class="form-hint">الجهة التعليمية والقسم والسطر الإضافي كتلة نصية واحدة. اختر موضعًا مختلفًا لكل كتلة ظاهرة لمنع التداخل.</p>
+            <div class="form-grid">
+              <div class="field"><label for="letterhead-logo-position">الشعار</label><select id="letterhead-logo-position"><option value="right">يمين</option><option value="center">وسط</option><option value="left">يسار</option></select></div>
+              <div class="field"><label for="letterhead-entity-position">الجهة العليا</label><select id="letterhead-entity-position"><option value="right">يمين</option><option value="center">وسط</option><option value="left">يسار</option></select></div>
+              <div class="field"><label for="letterhead-education-position">الجهة التعليمية والقسم / البرنامج</label><select id="letterhead-education-position"><option value="right">يمين</option><option value="center">وسط</option><option value="left">يسار</option></select></div>
+            </div>
+          </fieldset>
+          <p class="form-error" id="letterhead-error" role="alert" hidden></p>
+        </div>
+        <aside class="letterhead-live-panel"><h3>معاينة رأس الاختبار</h3><div id="letterhead-live-preview" class="letterhead-live-preview" aria-live="polite"></div><p class="form-hint">تتغير المعاينة فورًا دون حفظ. اسم القالب لا يُطبع.</p></aside>
+      </div>
+
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" data-close>إلغاء</button>
+        <button type="submit" class="btn btn-primary" id="save-letterhead-btn">حفظ القالب</button>
+      </div>
+    </form>
+  </dialog>
+
+  <footer class="site-footer no-print">
+    <div class="container">
+      <p>بنك أسئلة المعلم — كليشة واحدة، وعدة هويات تعليمية.</p>
+    </div>
+  </footer>
+</body>
+</html>

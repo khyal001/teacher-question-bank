@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg?v=teacher-bank-1">
   <title>الاختبارات | بنك أسئلة المعلم</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,7 +22,7 @@
   <header class="site-header no-print">
     <div class="container nav-wrap">
       <a class="brand" href="./dashboard.html" aria-label="بنك أسئلة المعلم">
-        <span class="brand-mark" aria-hidden="true">ب</span>
+        <img class="brand-mark" src="./favicon.svg?v=teacher-bank-1" alt="" aria-hidden="true">
         <span class="brand-text">بنك أسئلة المعلم</span>
       </a>
 
@@ -30,54 +31,60 @@
       <nav class="main-nav" id="main-nav" aria-label="التنقل الرئيسي">
         <a href="./dashboard.html" data-nav="dashboard">لوحة التحكم</a>
         <a href="./subjects.html" data-nav="subjects">المواد</a>
+        <a href="./groups.html" data-nav="groups">الصفوف والفصول والأقسام</a>
         <a href="./questions.html" data-nav="questions">الأسئلة</a>
         <a href="./exam-builder.html" data-nav="builder">إنشاء اختبار</a>
         <a href="./exam-view.html" data-nav="exams">الاختبارات</a>
+        <a href="./letterheads.html" data-nav="letterheads">الكليشة</a>
       </nav>
 
       <div class="nav-user">
-        <span class="nav-user-name" id="nav-user-name">المعلم</span>
+        <a class="profile-link" href="./profile.html" aria-label="الملف الشخصي"><svg class="user-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 22v-2a8 8 0 0 1 16 0v2"/></svg><span class="nav-user-name" id="nav-user-name">المعلم</span></a>
         <button class="btn btn-ghost btn-sm" id="logout-btn" type="button">تسجيل الخروج</button>
       </div>
     </div>
   </header>
 
   <main id="main-content" class="container page">
-    <section class="page-head no-print">
-      <div>
-        <p class="eyebrow" id="view-eyebrow">الاختبارات المحفوظة</p>
-        <h1 id="view-title">الاختبارات المحفوظة</h1>
-        <p class="muted" id="view-subtitle">افتح أي اختبار لعرضه وطباعته، أو أنشئ اختباراً جديداً.</p>
-      </div>
-      <div class="page-actions">
-        <a class="btn btn-primary" href="./exam-builder.html">إنشاء اختبار جديد</a>
-      </div>
-    </section>
-
-    <section id="exam-error" class="notice notice-error" role="alert" hidden></section>
-
-    <section id="exam-loading" class="card inline-loading" role="status" aria-live="polite" hidden>
-      <span class="spinner" aria-hidden="true"></span>
-      <p>جارٍ تحميل الاختبار...</p>
-    </section>
-
     <section id="exam-section" hidden>
-      <div class="exam-toolbar no-print" id="exam-toolbar">
-        <a class="btn btn-ghost" href="./exam-view.html">كل الاختبارات</a>
+      <div class="exam-toolbar no-print">
+        <div class="exam-toolbar-title">
+          <p class="eyebrow">الاختبار المحفوظ</p>
+          <h1 id="exam-page-title">الاختبار</h1>
+        </div>
         <div class="exam-toolbar-actions">
-          <button class="btn btn-outline" id="toggle-answers-btn" type="button" aria-expanded="false" aria-controls="answer-key">إظهار نموذج الإجابة</button>
-          <button class="btn btn-primary" id="print-exam-btn" type="button">طباعة الاختبار</button>
-          <button class="btn btn-ghost" id="print-answers-btn" type="button">طباعة نموذج الإجابة</button>
+          <button class="btn btn-primary" id="print-btn" type="button">طباعة الاختبار</button>
+          <button class="btn btn-outline" id="toggle-answer-key" type="button" aria-pressed="false">إظهار نموذج الإجابة</button>
+          <button class="btn btn-outline" id="print-answer-key-btn" type="button" hidden>طباعة نموذج الإجابة</button>
+          <button class="btn btn-ghost" id="print-help-btn" type="button">تعليمات الطباعة</button>
+          <a class="btn btn-ghost" href="./exam-view.html">كل الاختبارات</a>
         </div>
       </div>
 
-      <article class="exam-paper" id="exam-paper" aria-live="polite"></article>
+      <div id="exam-loading" class="card loading-card" role="status" aria-live="polite">
+        <span class="spinner" aria-hidden="true"></span>
+        <p>جارٍ تحميل الاختبار...</p>
+      </div>
+
+      <p class="form-error" id="exam-error" role="alert" hidden></p>
+
+      <article class="exam-paper" id="exam-paper" aria-label="ورقة الاختبار"></article>
     </section>
 
-    <section id="exams-list-section" class="no-print" hidden>
+    <section id="exams-list-section" hidden>
+      <section class="page-head">
+        <div>
+          <p class="eyebrow">الأرشيف</p>
+          <h1>الاختبارات المحفوظة</h1>
+          <p class="muted">كل اختبار نسخة ثابتة من أسئلته وكليشته ودرجاته وقت الإنشاء.</p>
+        </div>
+        <div class="page-actions no-print">
+          <a class="btn btn-primary" href="./exam-builder.html">إنشاء اختبار جديد</a>
+        </div>
+      </section>
+
       <div class="list-toolbar">
         <span class="count-pill" id="exams-count">—</span>
-        <span class="muted">الاختبارات المحفوظة لا تتأثر بتعديل أو حذف الأسئلة الأصلية.</span>
       </div>
 
       <div id="exams-list" class="exam-list" aria-live="polite">
@@ -90,9 +97,44 @@
     </section>
   </main>
 
+  <dialog class="modal print-notice-dialog no-print" id="print-notice-dialog" aria-labelledby="print-notice-title">
+    <div class="modal-head">
+      <h2 id="print-notice-title">قبل الطباعة</h2>
+      <button type="button" class="icon-btn" id="print-notice-close-x" aria-label="إغلاق">×</button>
+    </div>
+
+    <div class="modal-body">
+      <div class="print-notice-icon" aria-hidden="true">🖨</div>
+      <p>
+        للحصول على ورقة نظيفة، عطّل خيار <strong>«الرؤوس والتذييلات» (Headers and footers)</strong>
+        في نافذة الطباعة، واختر الهوامش الافتراضية. هذا يمنع ظهور عنوان الصفحة، والتاريخ،
+        ورابط الموقع أعلى الورقة وأسفلها.
+      </p>
+      <ul class="print-notice-steps">
+        <li>افتح نافذة الطباعة من الزر «طباعة الاختبار».</li>
+        <li>ابحث عن «خيارات إضافية» أو «المزيد من الإعدادات».</li>
+        <li>ألغِ تحديد «الرؤوس والتذييلات».</li>
+        <li>تأكد من حجم الورق A4 والاتجاه عمودي.</li>
+      </ul>
+
+      <label class="check-option">
+        <input type="checkbox" id="print-notice-dismiss">
+        <span>
+          <strong>لا تعرض هذا التنبيه مرة أخرى على هذا الجهاز</strong>
+          <small>يمكنك فتحه لاحقاً من زر «تعليمات الطباعة».</small>
+        </span>
+      </label>
+    </div>
+
+    <div class="modal-foot">
+      <button type="button" class="btn btn-ghost" id="print-notice-close">إغلاق</button>
+      <button type="button" class="btn btn-primary" id="print-notice-continue">متابعة الطباعة</button>
+    </div>
+  </dialog>
+
   <footer class="site-footer no-print">
     <div class="container">
-      <p>بنك أسئلة المعلم — نسخة الطالب ونسخة المعلم من الاختبار نفسه.</p>
+      <p>بنك أسئلة المعلم — كل اختبار محفوظ بنسخته الكاملة.</p>
     </div>
   </footer>
 </body>

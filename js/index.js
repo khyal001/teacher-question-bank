@@ -1,6 +1,11 @@
 // صفحة تسجيل الدخول وإنشاء الحساب.
 import { supabase, isSupabaseConfigured } from './supabase.js';
-import { getEmailRedirectTo, getSessionUser } from './auth.js';
+import {
+  consumeAuthNext,
+  getEmailRedirectTo,
+  getSessionUser,
+  rememberAuthNext,
+} from './auth.js';
 import { friendlyError, setButtonBusy, showFormError } from './ui.js';
 
 const loginForm = document.getElementById('login-form');
@@ -15,6 +20,9 @@ init();
 async function init() {
   setupTabs();
   bindForms();
+
+  const nextParam = new URLSearchParams(window.location.search).get('next');
+  if (nextParam) rememberAuthNext(nextParam);
 
   if (!isSupabaseConfigured) {
     setupNotice.hidden = false;
@@ -35,7 +43,7 @@ async function init() {
   try {
     const user = await getSessionUser();
     if (user) {
-      window.location.replace('./dashboard.html');
+      window.location.replace(consumeAuthNext(nextParam));
     }
   } catch {
     // نترك النماذج متاحة؛ ستظهر رسالة واضحة عند محاولة الدخول.
@@ -107,7 +115,8 @@ async function handleLogin(event) {
   try {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
-    window.location.replace('./dashboard.html');
+    const nextParam = new URLSearchParams(window.location.search).get('next');
+    window.location.replace(consumeAuthNext(nextParam));
   } catch (error) {
     showFormError(loginError, friendlyError(error));
   } finally {
@@ -167,8 +176,9 @@ async function handleSignup(event) {
     }
 
     if (data.session) {
-      showFeedback('تم إنشاء الحساب وتسجيل دخولك بنجاح. جارٍ التحويل إلى لوحة التحكم...', 'success');
-      window.location.replace('./dashboard.html');
+      showFeedback('تم إنشاء الحساب وتسجيل دخولك بنجاح. جارٍ التحويل...', 'success');
+      const nextParam = new URLSearchParams(window.location.search).get('next');
+      window.location.replace(consumeAuthNext(nextParam));
       return;
     }
 

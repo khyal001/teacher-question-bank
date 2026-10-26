@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>بنك أسئلة المعلم</title>
+  <rect width="64" height="64" rx="14" fill="#1b6f66"/>
+  <path d="M10 15h13c4 0 7 2 9 5 2-3 5-5 9-5h13v34H41c-4 0-7 2-9 5-2-3-5-5-9-5H10Z" fill="#fff"/>
+  <path d="M32 21v28M16 25h9m-9 8h9m-9 8h9m14-16h9m-9 8h9m-9 8h9" fill="none" stroke="#1b6f66" stroke-width="3" stroke-linecap="round"/>
+</svg>

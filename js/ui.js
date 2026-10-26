@@ -14,6 +14,15 @@ export const DIFFICULTY_LABELS = Object.freeze({
 
 export const DIFFICULTY_ORDER = Object.freeze(['easy', 'medium', 'hard']);
 
+export const GROUP_SCOPE_LABELS = Object.freeze({
+  all: 'جميع الصفوف والفصول والأقسام',
+  selected: 'صفوف وفصول وأقسام محددة',
+});
+
+export const PRINT_NOTICE_STORAGE_KEY = 'teacher-question-bank:print-notice-dismissed';
+
+export const ASSET_BUCKET = 'letterhead-logos';
+
 /**
  * إنشاء عنصر DOM بأمان. النصوص تُضاف عبر textContent دائماً.
  */
@@ -193,7 +202,7 @@ export function formatDate(value, withTime = false) {
 export function formatPoints(value) {
   const num = Number(value);
   if (!Number.isFinite(num)) return '0';
-  return String(Math.round(num * 100) / 100);
+  return String(num);
 }
 
 export function answerDisplay(type, answer) {
@@ -245,4 +254,60 @@ export function showFormError(element, message) {
 export function scrollToList(element) {
   if (!element) return;
   element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+export async function copyText(text) {
+  const value = String(text ?? '');
+
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(value);
+      return true;
+    }
+  } catch {
+    // نكمل إلى البديل المحلي.
+  }
+
+  try {
+    const area = h('textarea', {
+      class: 'clipboard-fallback',
+      readonly: true,
+      'aria-hidden': 'true',
+    });
+    area.value = value;
+    area.style.position = 'fixed';
+    area.style.insetInlineStart = '-9999px';
+    document.body.appendChild(area);
+    area.select();
+    const copied = document.execCommand('copy');
+    area.remove();
+    return copied;
+  } catch {
+    return false;
+  }
+}
+
+export function readLocalFlag(key) {
+  try {
+    return window.localStorage.getItem(key) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function writeLocalFlag(key, enabled) {
+  try {
+    if (enabled) {
+      window.localStorage.setItem(key, '1');
+    } else {
+      window.localStorage.removeItem(key);
+    }
+  } catch {
+    // التخزين المحلي قد يكون معطلاً؛ نتابع دون حفظ التفضيل.
+  }
+}
+
+export function shorten(text, max = 90) {
+  const value = String(text ?? '');
+  return value.length > max ? `${value.slice(0, max)}…` : value;
 }

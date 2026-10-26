@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg?v=teacher-bank-1">
+  <title>الملف الشخصي | بنك أسئلة المعلم</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./css/style.css">
+  <script type="module" src="./js/profile.js"></script>
+</head>
+<body data-page="profile" class="auth-pending">
+  <a class="skip-link" href="#main-content">تخطَّ إلى المحتوى</a>
+
+  <div id="page-loading" class="page-loader" role="status" aria-live="polite">
+    <span class="spinner" aria-hidden="true"></span>
+    <p id="page-loading-text">جارٍ التحقق من الجلسة...</p>
+  </div>
+
+  <header class="site-header no-print">
+    <div class="container nav-wrap">
+      <a class="brand" href="./dashboard.html" aria-label="بنك أسئلة المعلم">
+        <img class="brand-mark" src="./favicon.svg?v=teacher-bank-1" alt="" aria-hidden="true">
+        <span class="brand-text">بنك أسئلة المعلم</span>
+      </a>
+
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-label="فتح قائمة التنقل" aria-expanded="false" aria-controls="main-nav">☰</button>
+
+      <nav class="main-nav" id="main-nav" aria-label="التنقل الرئيسي">
+        <a href="./dashboard.html" data-nav="dashboard">لوحة التحكم</a>
+        <a href="./subjects.html" data-nav="subjects">المواد</a>
+        <a href="./groups.html" data-nav="groups">الصفوف والفصول والأقسام</a>
+        <a href="./questions.html" data-nav="questions">الأسئلة</a>
+        <a href="./exam-builder.html" data-nav="builder">إنشاء اختبار</a>
+        <a href="./exam-view.html" data-nav="exams">الاختبارات</a>
+        <a href="./letterheads.html" data-nav="letterheads">الكليشة</a>
+      </nav>
+
+      <div class="nav-user">
+        <a class="profile-link" href="./profile.html" aria-label="الملف الشخصي"><svg class="user-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 22v-2a8 8 0 0 1 16 0v2"/></svg><span class="nav-user-name" id="nav-user-name">المعلم</span></a>
+        <button class="btn btn-ghost btn-sm" id="logout-btn" type="button">تسجيل الخروج</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container page-main" id="main-content">
+    <div class="page-heading"><div><h1>الملف الشخصي</h1><p class="muted">عدّل الاسم الذي يظهر في حسابك.</p></div></div>
+    <section class="panel profile-panel">
+      <form id="profile-form">
+        <div class="field"><label for="profile-name">الاسم الظاهر</label><input id="profile-name" type="text" autocomplete="name" maxlength="160" required></div>
+        <div class="field"><label for="profile-email">البريد الإلكتروني</label><input id="profile-email" type="email" dir="ltr" readonly><p class="form-hint">للقراءة فقط.</p></div>
+        <p class="form-error" id="profile-error" role="alert" hidden></p>
+        <button class="btn btn-primary" id="profile-save" type="submit">حفظ الاسم</button>
+      </form>
+    </section>
+  </main>
+
+  <footer class="site-footer no-print">
+    <div class="container">
+      <p>بنك أسئلة المعلم — بياناتك خاصة بك وحدك.</p>
+    </div>
+  </footer>
+</body>
+</html>

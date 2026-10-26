@@ -1,12 +1,14 @@
-// إدارة الأسئلة: إضافة، تعديل، نسخ، حذف، وفلترة.
+import { fetchAll } from './data-utils.js';
+import { requestQuestionPage } from './question-page-data.js';
+// إدارة الأسئلة: إضافة، تعديل، نسخ، حذف، وفلترة مع نطاق صفوف وفصول وأقسام.
 import { supabase } from './supabase.js';
-import { initNav, requireAuth } from './auth.js';
+import { applyNavigationRole, initNav, requireAuth } from './auth.js';
 import {
   DIFFICULTY_LABELS,
+  GROUP_SCOPE_LABELS,
   TYPE_LABELS,
   answerDisplay,
   formatDate,
-  formatPoints,
   friendlyError,
   h,
   renderEmptyState,
@@ -33,14 +35,15 @@ const form = document.getElementById('question-form');
 const dialogTitle = document.getElementById('question-dialog-title');
 const idInput = document.getElementById('question-id');
 const subjectSelect = document.getElementById('question-subject');
-const gradeDisplay = document.getElementById('question-grade');
 const unitInput = document.getElementById('question-unit');
 const typeSelect = document.getElementById('question-type');
 const difficultySelect = document.getElementById('question-difficulty');
-const pointsInput = document.getElementById('question-points');
 const textInput = document.getElementById('question-text');
 const errorBox = document.getElementById('question-error');
 const saveButton = document.getElementById('save-question-btn');
+
+const questionGroupsList = document.getElementById('question-groups');
+const questionGroupsHint = document.getElementById('question-groups-hint');
 
 const mcqFields = document.getElementById('mcq-fields');
 const trueFalseFields = document.getElementById('true-false-fields');
@@ -51,10 +54,22 @@ const shortAnswerInput = document.getElementById('short-answer');
 
 let currentUser = null;
 let subjects = [];
+const groupsById = new Map();
+const editorGroups = new Map();
+const editorRequests = new Map();
+let editorVersion = 0;
+let editorLoading = false;
+let metadataLoaded = false;
+let questionGroups = new Map();
 let allQuestions = [];
 let editingId = null;
 let loadToken = 0;
 let searchTimer = null;
+const pageSize = 25;
+let offset = 0;
+const previousPage = document.getElementById('questions-prev');
+const nextPage = document.getElementById('questions-next');
+const pageLabel = document.getElementById('questions-page');
 
 const filters = {
   subject: '',
@@ -70,36 +85,77 @@ async function init() {
   currentUser = await requireAuth();
   if (!currentUser) return;
 
-  initNav('questions', currentUser);
-  bindEvents();
-
-  await loadSubjects();
   applyUrlFilters();
-  await loadUnits();
-  await loadQuestions();
-  await handleUrlActions();
+  const firstPage = requestQuestionPage(supabase, filters, { limit: pageSize, metadata: true });
+  initNav('questions', currentUser, { rolePromise: firstPage.then((page) => page.metadata.role) });
+  bindEvents();
+  if (await loadQuestions(false, firstPage)) await handleUrlActions();
+
+  try {
+    const flash = window.sessionStorage.getItem('questionsFlash');
+    if (flash) {
+      window.sessionStorage.removeItem('questionsFlash');
+      toast(flash);
+    }
+  } catch {
+    // التخزين المؤقت غير متاح؛ لا يؤثر في تحميل الصفحة.
+  }
 }
 
 // ------------------------------------------------------------
 // البيانات
 // ------------------------------------------------------------
-async function loadSubjects() {
-  const { data, error } = await supabase
-    .from('subjects')
-    .select('id, name, grade_level')
-    .eq('user_id', currentUser.id)
-    .order('name', { ascending: true });
-
-  if (error) {
-    toast(friendlyError(error), 'error');
-    return;
-  }
-
-  subjects = data || [];
-
+function applyPageMetadata(metadata) {
+  subjects = metadata.subjects;
   fillSubjectSelect(filterSubject, true);
   fillSubjectSelect(subjectSelect, false);
   filterSubject.value = filters.subject;
+  const units = [...new Set(metadata.units.map((unit) => String(unit).trim()).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, 'ar'));
+  filterUnit.replaceChildren(h('option', { value: '' }, 'كل الوحدات والأبواب والفصول'),
+    ...units.map((unit) => h('option', { value: unit }, unit)));
+  filterUnit.value = filters.unit;
+  applyNavigationRole(metadata.role);
+  metadataLoaded = true;
+}
+
+async function ensureEditorGroups(subjectId) {
+  if (editorGroups.has(subjectId)) return editorGroups.get(subjectId);
+  if (!editorRequests.has(subjectId)) {
+    editorRequests.set(subjectId, fetchAll(supabase.from('subject_groups')
+      .select('group_id, teaching_groups(id, name)', { count: 'exact' })
+      .eq('subject_id', subjectId).eq('user_id', currentUser.id), ['group_id'])
+      .then(({ data, error }) => {
+        if (error) throw error;
+        const groups = (data || []).flatMap((row) => row.teaching_groups ? [row.teaching_groups] : []);
+        editorGroups.set(subjectId, groups);
+        for (const group of groups) groupsById.set(group.id, group);
+        return groups;
+      }).finally(() => editorRequests.delete(subjectId)));
+  }
+  return editorRequests.get(subjectId);
+}
+
+async function loadDialogGroups(question = null) {
+  const version = ++editorVersion;
+  const subjectId = subjectSelect.value;
+  editorLoading = true;
+  saveButton.disabled = true;
+  form.querySelectorAll('input[name="group-scope"]').forEach((radio) => { radio.disabled = true; });
+  questionGroupsList.replaceChildren();
+  questionGroupsHint.textContent = 'جارٍ تحميل الصفوف والفصول والأقسام للمادة...';
+  try {
+    await ensureEditorGroups(subjectId);
+    if (version !== editorVersion || !dialog.open || subjectId !== subjectSelect.value) return;
+    renderGroupScope(question);
+    saveButton.disabled = false;
+  } catch (error) {
+    if (version !== editorVersion || !dialog.open) return;
+    showFormError(errorBox, friendlyError(error));
+    questionGroupsHint.textContent = 'تعذر تحميل الخيارات. أعد فتح النموذج للمحاولة مجددًا.';
+  } finally {
+    if (version === editorVersion) editorLoading = false;
+  }
 }
 
 function fillSubjectSelect(select, includeAll) {
@@ -111,13 +167,7 @@ function fillSubjectSelect(select, includeAll) {
   }
 
   for (const subject of subjects) {
-    options.push(
-      h(
-        'option',
-        { value: subject.id },
-        `${subject.name}${subject.grade_level ? ` — ${subject.grade_level}` : ''}`,
-      ),
-    );
+    options.push(h('option', { value: subject.id }, subject.name));
   }
 
   select.replaceChildren(...options);
@@ -127,36 +177,19 @@ function fillSubjectSelect(select, includeAll) {
   }
 }
 
-async function loadUnits() {
-  const { data, error } = await supabase
-    .from('questions')
-    .select('unit')
-    .eq('user_id', currentUser.id);
-
-  if (error) {
-    toast(friendlyError(error), 'error');
-    return;
-  }
-
-  const units = Array.from(
-    new Set((data || []).map((row) => (row.unit || '').trim()).filter(Boolean)),
-  ).sort((a, b) => a.localeCompare(b, 'ar'));
-
-  if (filters.unit && !units.includes(filters.unit)) {
-    filters.unit = '';
-  }
-
-  const options = [h('option', { value: '' }, 'كل الوحدات')];
-  for (const unit of units) {
-    options.push(h('option', { value: unit }, unit));
-  }
-
-  filterUnit.replaceChildren(...options);
-  filterUnit.value = filters.unit;
+function groupsOfSubject(subjectId) {
+  return editorGroups.get(subjectId) || [];
 }
 
-async function loadQuestions() {
+function groupNamesOfQuestion(questionId) {
+  return (questionGroups.get(questionId) || []).map((id) => groupsById.get(id)?.name).filter(Boolean);
+}
+
+async function loadQuestions(keepPage = false, pendingPage = null, refreshMetadata = false) {
+  if (!keepPage) offset = 0;
   const token = ++loadToken;
+  previousPage.disabled = true;
+  nextPage.disabled = true;
 
   questionsSummary.textContent = 'جارٍ تحميل الأسئلة...';
   questionsList.replaceChildren(
@@ -169,41 +202,48 @@ async function loadQuestions() {
     ),
   );
 
-  let query = supabase
-    .from('questions')
-    .select(
-      'id, subject_id, unit, type, question_text, options, correct_answer, difficulty, points, created_at, subjects(name, grade_level)',
-    )
-    .eq('user_id', currentUser.id)
-    .order('created_at', { ascending: false });
-
-  if (filters.subject) query = query.eq('subject_id', filters.subject);
-  if (filters.difficulty) query = query.eq('difficulty', filters.difficulty);
-  if (filters.type) query = query.eq('type', filters.type);
-  if (filters.unit) query = query.eq('unit', filters.unit);
-  if (filters.search) query = query.ilike('question_text', `%${filters.search}%`);
-
-  const { data, error } = await query;
-
-  // تجاهل استجابة قديمة إذا تغيرت الفلاتر أثناء التحميل.
-  if (token !== loadToken) return;
-
-  if (error) {
+  let page;
+  try {
+    page = await (pendingPage || requestQuestionPage(supabase, filters, {
+      offset, limit: pageSize, metadata: refreshMetadata || !metadataLoaded,
+    }));
+  } catch (error) {
+    if (token !== loadToken) return false;
     questionsCount.textContent = '—';
     questionsSummary.textContent = 'تعذر تحميل الأسئلة.';
     renderInlineError(questionsList, friendlyError(error));
-    return;
+    return false;
+  }
+
+  // A slower earlier filter request must never overwrite a newer page.
+  if (token !== loadToken) return false;
+  const data = page.questions;
+  const count = page.total;
+  filters.subject = page.subject_id || '';
+  if (page.metadata) applyPageMetadata(page.metadata);
+  filterSubject.value = filters.subject;
+  if (!data.length && offset > 0 && count <= offset) {
+    offset = Math.max(0, (Math.ceil(count / pageSize) - 1) * pageSize);
+    return loadQuestions(true);
+  }
+  for (const row of data) for (const group of row.question_groups || []) {
+    groupsById.set(group.group_id, { id: group.group_id, name: group.name });
   }
 
   allQuestions = data || [];
+  questionGroups = new Map(allQuestions.map((row) => [row.id, (row.question_groups || []).map((link) => link.group_id)]));
   renderQuestions(allQuestions);
+  previousPage.disabled = offset === 0;
+  nextPage.disabled = offset + pageSize >= count;
+  pageLabel.textContent = `صفحة ${Math.floor(offset / pageSize) + 1}`;
 
   const hasFilters = isFilterActive();
-  const countText = `${allQuestions.length} سؤال`;
+  const countText = `${count} سؤال`;
   questionsCount.textContent = countText;
   questionsSummary.textContent = hasFilters
     ? 'نتائج مطابقة للفلاتر الحالية.'
     : 'جميع أسئلتك في بنك الأسئلة.';
+  return true;
 }
 
 function isFilterActive() {
@@ -245,10 +285,15 @@ function renderQuestions(questions) {
 }
 
 function renderQuestionCard(question) {
-  const subject = Array.isArray(question.subjects) ? question.subjects[0] : question.subjects;
-  const subjectLabel = subject
-    ? `${subject.name}${subject.grade_level ? ` — ${subject.grade_level}` : ''}`
-    : 'مادة محذوفة';
+  const subject = subjects.find((row) => row.id === question.subject_id);
+  const subjectLabel = subject?.name || 'مادة محذوفة';
+  const selectedGroups = groupNamesOfQuestion(question.id);
+
+  const scopeLabel = question.group_scope === 'selected'
+    ? selectedGroups.length > 0
+      ? selectedGroups.join('، ')
+      : 'بدون صفوف وفصول وأقسام محددة'
+    : GROUP_SCOPE_LABELS.all;
 
   const card = h(
     'article',
@@ -261,7 +306,7 @@ function renderQuestionCard(question) {
         { class: 'badges' },
         h('span', { class: `badge badge-${question.difficulty}`, text: DIFFICULTY_LABELS[question.difficulty] || question.difficulty }),
         h('span', { class: 'badge badge-type', text: TYPE_LABELS[question.type] || question.type }),
-        h('span', { class: 'badge badge-points', text: `${formatPoints(question.points)} درجة` }),
+        h('span', { class: 'badge badge-subject', text: scopeLabel }),
       ),
       h('span', { class: 'question-subject', text: subjectLabel }),
     ),
@@ -304,7 +349,7 @@ function renderQuestionCard(question) {
       h(
         'div',
         { class: 'question-meta' },
-        h('span', { text: `الوحدة: ${question.unit || 'غير محددة'}` }),
+        h('span', { text: `الوحدة / الباب / الفصل: ${question.unit || 'غير محدد'}` }),
         h('span', { class: 'dot', 'aria-hidden': 'true', text: '•' }),
         h('span', { text: formatDate(question.created_at, true) }),
       ),
@@ -341,6 +386,7 @@ function renderQuestionCard(question) {
 // النموذج
 // ------------------------------------------------------------
 function openQuestionDialog({ question = null, duplicate = false } = {}) {
+  if (!metadataLoaded) { toast('انتظر اكتمال تحميل بيانات الصفحة.'); return; }
   if (subjects.length === 0) {
     toast('أضف مادة أولاً من صفحة المواد قبل إضافة الأسئلة.', 'error');
     return;
@@ -361,18 +407,18 @@ function openQuestionDialog({ question = null, duplicate = false } = {}) {
 
   const defaultSubject = question?.subject_id || filters.subject || subjects[0].id;
   subjectSelect.value = defaultSubject;
-  updateGradeDisplay();
 
   unitInput.value = question?.unit || '';
   typeSelect.value = question?.type || 'mcq';
   difficultySelect.value = question?.difficulty || 'medium';
-  pointsInput.value = String(Number(question?.points ?? 1));
   textInput.value = question?.question_text || '';
   shortAnswerInput.value = question?.type === 'short' ? question.correct_answer || '' : '';
 
   form.querySelectorAll('input[name="true-false-answer"]').forEach((radio) => {
     radio.checked = question?.type === 'true_false' && radio.value === question.correct_answer;
   });
+
+  setScopeRadio(question?.group_scope || 'all');
 
   if (question?.type === 'mcq' && Array.isArray(question.options)) {
     question.options.forEach((option) => {
@@ -391,11 +437,115 @@ function openQuestionDialog({ question = null, duplicate = false } = {}) {
 
   dialog.showModal();
   textInput.focus();
+  loadDialogGroups(question);
 }
 
-function updateGradeDisplay() {
-  const subject = subjects.find((item) => item.id === subjectSelect.value);
-  gradeDisplay.textContent = subject?.grade_level || 'غير محدد';
+function renderGroupScope(question = null) {
+  const subjectId = subjectSelect.value;
+  const groups = groupsOfSubject(subjectId);
+  const selectedIds = new Set(question ? questionGroups.get(question.id) || [] : []);
+  const desiredScope = question?.group_scope || 'all';
+
+  questionGroupsList.replaceChildren();
+
+  if (groups.length === 0) {
+    questionGroupsList.hidden = true;
+
+    if (desiredScope === 'selected') {
+      // لا نحوّل سؤالاً محدد الصفوف والفصول والأقسام إلى "all" بصمت عند غياب الصفوف والفصول والأقسام.
+      setScopeRadioDisabled(false);
+      setScopeRadio('selected');
+      questionGroupsHint.textContent =
+        'هذه المادة بلا صفوف وفصول وأقسام حالياً. السؤال محدد بصفوف وفصول وأقسام غير متاحة؛ أضف صفوف وفصول وأقسام للمادة، أو اختر «جميع الصفوف والفصول والأقسام» صراحةً.';
+    } else {
+      setScopeRadio('all');
+      setScopeRadioDisabled(true);
+      questionGroupsHint.textContent =
+        'هذه المادة بلا صفوف وفصول وأقسام حالياً. سيُطبق السؤال على جميع صفوفها وفصولها وأقسامها، وأي صف / فصل / قسم يضاف لاحقاً.';
+    }
+    return;
+  }
+
+  setScopeRadioDisabled(false);
+
+  for (const group of groups) {
+    const checkbox = h('input', {
+      type: 'checkbox',
+      value: group.id,
+      name: 'question-group',
+    });
+    checkbox.checked = selectedIds.has(group.id) || groups.length === 1;
+    checkbox.disabled = groups.length === 1;
+
+    questionGroupsList.appendChild(
+      h(
+        'label',
+        { class: 'group-check' },
+        checkbox,
+        h('span', { class: 'group-check-name', text: group.name }),
+      ),
+    );
+  }
+
+  const scope = desiredScope === 'selected' ? 'selected' : 'all';
+  setScopeRadio(scope);
+  updateScopeUI();
+
+  // عند النسخ أو التعديل، لا نفرض "all" إن كانت الصفوف والفصول والأقسام المختارة لم تعد مرتبطة.
+  if (question?.group_scope === 'selected') {
+    setScopeRadio('selected');
+    updateScopeUI();
+  }
+}
+
+function setScopeRadio(value) {
+  form.querySelectorAll('input[name="group-scope"]').forEach((radio) => {
+    radio.checked = radio.value === value;
+  });
+}
+
+function setScopeRadioDisabled(disabled) {
+  form.querySelectorAll('input[name="group-scope"]').forEach((radio) => {
+    radio.disabled = disabled;
+    if (disabled && radio.value === 'selected') radio.checked = false;
+  });
+}
+
+function currentScope() {
+  return form.querySelector('input[name="group-scope"]:checked')?.value || 'all';
+}
+
+function checkedQuestionGroupIds() {
+  return Array.from(
+    questionGroupsList.querySelectorAll('input[name="question-group"]:checked'),
+  ).map((input) => input.value);
+}
+
+function updateScopeUI() {
+  const hasGroups = groupsOfSubject(subjectSelect.value).length > 0;
+  const scope = currentScope();
+  const showGroups = hasGroups && scope === 'selected';
+
+  questionGroupsList.hidden = !showGroups;
+
+  if (!hasGroups) {
+    questionGroupsHint.textContent = scope === 'selected'
+      ? 'هذه المادة بلا صفوف وفصول وأقسام حالياً. السؤال محدد بصفوف وفصول وأقسام غير متاحة؛ أضف صفوف وفصول وأقسام للمادة، أو اختر «جميع الصفوف والفصول والأقسام» صراحةً.'
+      : 'هذه المادة بلا صفوف وفصول وأقسام حالياً. سيُطبق السؤال على جميع صفوفها وفصولها وأقسامها، وأي صف / فصل / قسم يضاف لاحقاً.';
+    return;
+  }
+
+  const choices = groupsOfSubject(subjectSelect.value);
+  if (choices.length === 1) {
+    questionGroupsHint.textContent = scope === 'selected'
+      ? `تم اختيار «${choices[0].name}» تلقائيًا لهذا السؤال.`
+      : `الخيار الحالي: «${choices[0].name}». هذا النطاق يشمل أيضًا أي صف / فصل / قسم يضاف للمادة مستقبلًا.`;
+    return;
+  }
+
+  questionGroupsHint.textContent = showGroups
+    ? 'اختر صف / فصل / قسم واحد على الأقل. الدرجات تُحدد لاحقاً عند إنشاء الاختبار.'
+    : 'يشمل هذا الخيار أي صف / فصل / قسم يضاف إلى المادة لاحقاً دون تعديل السؤال.';
 }
 
 function updateTypeFields() {
@@ -480,6 +630,10 @@ function updateOptionState() {
 
 async function handleSubmit(event) {
   event.preventDefault();
+  if (editorLoading || !editorGroups.has(subjectSelect.value)) {
+    showFormError(errorBox, 'انتظر تحميل خيارات المادة قبل الحفظ.');
+    return;
+  }
   showFormError(errorBox, '');
 
   const subjectId = subjectSelect.value;
@@ -487,7 +641,9 @@ async function handleSubmit(event) {
   const questionText = textInput.value.trim();
   const unit = unitInput.value.trim();
   const difficulty = difficultySelect.value;
-  const points = Number(pointsInput.value);
+  const scope = currentScope();
+  const subjectGroupList = groupsOfSubject(subjectId);
+  const groupIds = scope === 'selected' ? checkedQuestionGroupIds() : [];
 
   if (!subjectId || !subjects.some((subject) => subject.id === subjectId)) {
     showFormError(errorBox, 'اختر مادة صحيحة.');
@@ -501,10 +657,16 @@ async function handleSubmit(event) {
     return;
   }
 
-  if (!Number.isFinite(points) || points <= 0) {
-    showFormError(errorBox, 'الدرجة يجب أن تكون رقماً أكبر من صفر.');
-    pointsInput.focus();
-    return;
+  if (scope === 'selected') {
+    if (subjectGroupList.length === 0) {
+      showFormError(errorBox, 'هذه المادة بلا صفوف وفصول وأقسام. أضف صفوف وفصول وأقسام للمادة أولاً أو اختر «جميع صفوف وفصول وأقسام المادة».');
+      return;
+    }
+
+    if (groupIds.length === 0) {
+      showFormError(errorBox, 'اختر صف / فصل / قسم واحد على الأقل عند تحديد نطاق «صفوف وفصول وأقسام محددة».');
+      return;
+    }
   }
 
   if (!['easy', 'medium', 'hard'].includes(difficulty)) {
@@ -567,32 +729,24 @@ async function handleSubmit(event) {
   setButtonBusy(saveButton, true, editingId ? 'جارٍ حفظ التعديلات...' : 'جارٍ حفظ السؤال...');
 
   try {
-    // لا نرسل user_id إطلاقاً؛ Supabase يضبطه من الجلسة وRLS يتحقق منه.
-    const payload = {
-      subject_id: subjectId,
-      unit: unit || null,
-      type,
-      question_text: questionText,
-      options,
-      correct_answer: correctAnswer,
-      difficulty,
-      points,
-    };
+    const { error } = await supabase.rpc('save_question', {
+      p_id: editingId,
+      p_subject_id: subjectId,
+      p_unit: unit || null,
+      p_type: type,
+      p_question_text: questionText,
+      p_options: options,
+      p_correct_answer: correctAnswer,
+      p_difficulty: difficulty,
+      p_group_scope: scope,
+      p_group_ids: groupIds,
+    });
 
-    const result = editingId
-      ? await supabase.from('questions').update(payload).eq('id', editingId).select('id')
-      : await supabase.from('questions').insert(payload).select('id');
-
-    if (result.error) throw result.error;
-
-    if (editingId && (!result.data || result.data.length === 0)) {
-      throw new Error('لم يتم العثور على السؤال أو لا تملك صلاحية تعديله.');
-    }
+    if (error) throw error;
 
     dialog.close();
     toast(editingId ? 'تم حفظ تعديلات السؤال.' : 'تمت إضافة السؤال بنجاح.');
-    await loadUnits();
-    await loadQuestions();
+    await loadQuestions(false, null, true);
   } catch (error) {
     showFormError(errorBox, friendlyError(error));
   } finally {
@@ -622,8 +776,7 @@ async function confirmDelete(question) {
     if (error) throw error;
 
     toast('تم حذف السؤال من بنك الأسئلة.');
-    await loadUnits();
-    await loadQuestions();
+    await loadQuestions(false, null, true);
   } catch (error) {
     toast(friendlyError(error), 'error');
   }
@@ -633,14 +786,22 @@ async function confirmDelete(question) {
 // الفلاتر والروابط
 // ------------------------------------------------------------
 function bindEvents() {
+  previousPage.addEventListener('click', () => { offset = Math.max(0, offset - pageSize); loadQuestions(true); });
+  nextPage.addEventListener('click', () => { offset += pageSize; loadQuestions(true); });
   // منع إعادة تحميل الصفحة عند الضغط على Enter داخل حقل البحث.
   filtersForm.addEventListener('submit', (event) => event.preventDefault());
 
   document.getElementById('add-question-btn').addEventListener('click', () => openQuestionDialog());
   addOptionButton.addEventListener('click', () => addOptionRow());
   typeSelect.addEventListener('change', updateTypeFields);
-  subjectSelect.addEventListener('change', updateGradeDisplay);
   form.addEventListener('submit', handleSubmit);
+
+  subjectSelect.addEventListener('change', () => { loadDialogGroups(null); });
+  dialog.addEventListener('close', () => { editorVersion++; editorLoading = false; });
+
+  form.querySelectorAll('input[name="group-scope"]').forEach((radio) => {
+    radio.addEventListener('change', updateScopeUI);
+  });
 
   filterSubject.addEventListener('change', () => {
     filters.subject = filterSubject.value;
@@ -665,7 +826,9 @@ function bindEvents() {
   filterSearch.addEventListener('input', () => {
     window.clearTimeout(searchTimer);
     searchTimer = window.setTimeout(() => {
-      filters.search = filterSearch.value.trim();
+      const nextSearch = filterSearch.value.trim();
+      if (nextSearch === filters.search) return;
+      filters.search = nextSearch;
       loadQuestions();
     }, 350);
   });
@@ -679,9 +842,12 @@ function bindEvents() {
   dialog.addEventListener('click', (event) => {
     if (event.target === dialog) dialog.close();
   });
+
+
 }
 
 function resetFilters() {
+  window.clearTimeout(searchTimer);
   filters.subject = '';
   filters.difficulty = '';
   filters.type = '';
@@ -701,7 +867,7 @@ function applyUrlFilters() {
   const params = new URLSearchParams(window.location.search);
 
   const subjectParam = params.get('subject');
-  if (subjectParam && subjects.some((subject) => subject.id === subjectParam)) {
+  if (subjectParam && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(subjectParam)) {
     filters.subject = subjectParam;
   }
 
@@ -739,9 +905,12 @@ async function handleUrlActions() {
   const editId = params.get('edit');
   if (!editId) return;
 
+  const loaded = allQuestions.find((question) => question.id === editId);
+  if (loaded) { openQuestionDialog({ question: loaded }); return; }
+
   const { data, error } = await supabase
     .from('questions')
-    .select('id, subject_id, unit, type, question_text, options, correct_answer, difficulty, points')
+    .select('id, subject_id, unit, type, question_text, options, correct_answer, difficulty, group_scope, question_groups(group_id)')
     .eq('id', editId)
     .maybeSingle();
 
@@ -755,5 +924,6 @@ async function handleUrlActions() {
     return;
   }
 
+  questionGroups.set(data.id, (data.question_groups || []).map((link) => link.group_id));
   openQuestionDialog({ question: data });
 }

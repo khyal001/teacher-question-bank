@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg?v=teacher-bank-1">
+  <title>الصفوف والفصول والأقسام | بنك أسئلة المعلم</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./css/style.css">
+  <script type="module" src="./js/groups.js"></script>
+</head>
+<body data-page="groups" class="auth-pending">
+  <a class="skip-link" href="#main-content">تخطَّ إلى المحتوى</a>
+
+  <div id="page-loading" class="page-loader" role="status" aria-live="polite">
+    <span class="spinner" aria-hidden="true"></span>
+    <p id="page-loading-text">جارٍ التحقق من الجلسة...</p>
+  </div>
+
+  <header class="site-header no-print">
+    <div class="container nav-wrap">
+      <a class="brand" href="./dashboard.html" aria-label="بنك أسئلة المعلم">
+        <img class="brand-mark" src="./favicon.svg?v=teacher-bank-1" alt="" aria-hidden="true">
+        <span class="brand-text">بنك أسئلة المعلم</span>
+      </a>
+
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-label="فتح قائمة التنقل" aria-expanded="false" aria-controls="main-nav">☰</button>
+
+      <nav class="main-nav" id="main-nav" aria-label="التنقل الرئيسي">
+        <a href="./dashboard.html" data-nav="dashboard">لوحة التحكم</a>
+        <a href="./subjects.html" data-nav="subjects">المواد</a>
+        <a href="./groups.html" data-nav="groups">الصفوف والفصول والأقسام</a>
+        <a href="./questions.html" data-nav="questions">الأسئلة</a>
+        <a href="./exam-builder.html" data-nav="builder">إنشاء اختبار</a>
+        <a href="./exam-view.html" data-nav="exams">الاختبارات</a>
+        <a href="./letterheads.html" data-nav="letterheads">الكليشة</a>
+      </nav>
+
+      <div class="nav-user">
+        <a class="profile-link" href="./profile.html" aria-label="الملف الشخصي"><svg class="user-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 22v-2a8 8 0 0 1 16 0v2"/></svg><span class="nav-user-name" id="nav-user-name">المعلم</span></a>
+        <button class="btn btn-ghost btn-sm" id="logout-btn" type="button">تسجيل الخروج</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main-content" class="container page">
+    <section class="page-head">
+      <div>
+        <p class="eyebrow">التنظيم الدراسي</p>
+        <h1>الصفوف والفصول والأقسام</h1>
+        <p class="muted">أضف ما تدرّسه، مثل «الأول الثانوي»، «الأول الثانوي - أ»، أو «قسم الشريعة - المستوى الأول»، ثم اربطه بموادك.</p>
+      </div>
+      <div class="page-actions no-print">
+        <a class="btn btn-ghost" href="./subjects.html">ربط المواد بالصفوف والفصول والأقسام</a>
+      </div>
+    </section>
+
+    <div class="notice notice-info no-print">
+      <strong>كيف تعمل؟</strong>
+      <span>يمكن ربط الصف / الفصل / القسم بأكثر من مادة. حذف هذا الخيار يزيل ارتباطه بالمواد والأسئلة فقط، ولا يحذف المواد أو الأسئلة نفسها.</span>
+    </div>
+
+    <section class="card add-group-card" aria-labelledby="add-group-title">
+      <div class="card-head">
+        <h2 id="add-group-title">إضافة صف / فصل / قسم</h2>
+      </div>
+
+      <form id="add-group-form" class="inline-form" novalidate>
+        <div class="field inline-form-field">
+          <label for="group-name">اسم الصف / الفصل / القسم <span class="req">*</span></label>
+          <input id="group-name" type="text" maxlength="120" placeholder="مثال: الأول الثانوي - أ، أو قسم اللغة العربية - المستوى الأول" required>
+        </div>
+        <button class="btn btn-primary" id="add-group-btn" type="submit">إضافة الصف / الفصل / القسم</button>
+      </form>
+
+      <p class="form-error" id="group-error" role="alert" hidden></p>
+    </section>
+
+    <section class="card list-card" aria-labelledby="groups-title">
+      <div class="card-head">
+        <h2 id="groups-title">قائمة الصفوف والفصول والأقسام</h2>
+        <span class="count-pill" id="groups-count">—</span>
+      </div>
+
+      <div id="groups-list" aria-live="polite">
+        <div class="skeleton-list" aria-hidden="true">
+          <span class="skeleton-line"></span>
+          <span class="skeleton-line"></span>
+          <span class="skeleton-line"></span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <dialog class="modal" id="edit-group-dialog" aria-labelledby="edit-group-title">
+    <form id="edit-group-form" novalidate>
+      <div class="modal-head">
+        <h2 id="edit-group-title">تعديل الصف / الفصل / القسم</h2>
+        <button type="button" class="icon-btn" data-close aria-label="إغلاق">×</button>
+      </div>
+
+      <div class="modal-body">
+        <input type="hidden" id="edit-group-id">
+        <div class="field">
+          <label for="edit-group-name">اسم الصف / الفصل / القسم <span class="req">*</span></label>
+          <input id="edit-group-name" type="text" maxlength="120" required>
+        </div>
+        <p class="form-error" id="edit-group-error" role="alert" hidden></p>
+      </div>
+
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" data-close>إلغاء</button>
+        <button type="submit" class="btn btn-primary" id="save-group-btn">حفظ التعديلات</button>
+      </div>
+    </form>
+  </dialog>
+
+  <footer class="site-footer no-print">
+    <div class="container">
+      <p>بنك أسئلة المعلم — صفوف وفصول وأقسام مستقلة، وربط مرن مع المواد.</p>
+    </div>
+  </footer>
+</body>
+</html>
