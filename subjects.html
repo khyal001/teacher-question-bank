@@ -47,7 +47,7 @@
       <div>
         <p class="eyebrow">بنك الأسئلة</p>
         <h1>المواد والصفوف</h1>
-        <p class="muted">أنشئ المواد التي تدرّسها، وحدّد الصف أو المستوى لكل مادة.</p>
+        <p class="muted">أنشئ المواد التي تدرّسها، وحدّد الصف أو المستوى الإلزامي لكل مادة.</p>
       </div>
       <div class="page-actions no-print">
         <button class="btn btn-primary" id="add-subject-btn" type="button">إضافة مادة</button>
@@ -90,9 +90,9 @@
         </div>
 
         <div class="field">
-          <label for="subject-grade">المستوى أو الصف</label>
-          <input id="subject-grade" type="text" placeholder="مثال: الصف الثالث الثانوي" maxlength="120">
-          <p class="form-hint">اختياري، ويظهر في ترويسة الاختبارات.</p>
+          <label for="subject-grade">المستوى أو الصف <span class="req">*</span></label>
+          <input id="subject-grade" type="text" placeholder="مثال: الصف الثالث الثانوي" maxlength="120" required aria-required="true">
+          <p class="form-hint">إلزامي، ويظهر في ترويسة الاختبارات.</p>
         </div>
 
         <p class="form-error" id="subject-error" role="alert" hidden></p>

@@ -448,12 +448,17 @@ async function saveExam() {
     if (subjectError) throw subjectError;
     if (!subject) throw new Error('لم تعد المادة موجودة. أعد توليد المعاينة.');
 
+    const gradeLevel = (subject.grade_level || '').trim();
+    if (!gradeLevel) {
+      throw new Error('الصف الدراسي للمادة مطلوب. حدّث المادة وأضف الصف ثم أعد المحاولة.');
+    }
+
     const { data: exam, error: examError } = await supabase
       .from('exams')
       .insert({
         subject_id: subject.id,
         subject_name_snapshot: subject.name,
-        grade_level_snapshot: subject.grade_level || null,
+        grade_level_snapshot: gradeLevel,
         title: previewState.title,
         duration_minutes: previewState.duration,
       })

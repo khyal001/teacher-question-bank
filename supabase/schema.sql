@@ -1,6 +1,8 @@
 -- ============================================================
 -- بنك أسئلة المعلم — مخطط قاعدة البيانات الكامل لـ Supabase
--- شغّل هذا الملف كاملاً من SQL Editor داخل مشروع Supabase.
+-- شغّل هذا الملف كاملاً من SQL Editor داخل مشروع Supabase جديد.
+-- للمشاريع القائمة التي شغّلت نسخة سابقة: شغّل ملف الترقية
+-- supabase/migrations/20261026_require_subject_grade.sql
 -- ============================================================
 
 -- ------------------------------------------------------------
@@ -10,8 +12,9 @@ create table if not exists public.subjects (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
   name text not null,
-  grade_level text,
-  created_at timestamptz default now()
+  grade_level text not null,
+  created_at timestamptz default now(),
+  constraint subjects_grade_level_not_blank check (length(btrim(grade_level)) > 0)
 );
 
 -- ------------------------------------------------------------
@@ -40,6 +43,8 @@ create table if not exists public.exams (
   user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
   subject_id uuid references public.subjects (id) on delete set null,
   subject_name_snapshot text not null,
+  -- يبقى قابلاً لـ NULL للاختبارات التاريخية القديمة فقط؛
+  -- الاختبارات الجديدة يفرض لها Trigger قبل الإدراج صفاً غير فارغ.
   grade_level_snapshot text,
   title text not null,
   duration_minutes int check (duration_minutes is null or duration_minutes > 0),
@@ -253,6 +258,34 @@ drop trigger if exists exam_questions_protect_snapshot on public.exam_questions;
 create trigger exam_questions_protect_snapshot
   before update on public.exam_questions
   for each row execute function public.exam_questions_protect_snapshot();
+
+-- ============================================================
+-- الصف الدراسي في الاختبارات الجديدة
+-- يمنع إنشاء اختبار جديد بدون grade_level_snapshot غير فارغ.
+-- لا يطبق على UPDATE حتى تبقى الاختبارات التاريخية التي تحمل NULL
+-- صالحة، وحتى يعمل ON DELETE SET NULL عند حذف المادة.
+-- ============================================================
+create or replace function public.exams_require_grade_snapshot()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  new.grade_level_snapshot := btrim(coalesce(new.grade_level_snapshot, ''));
+
+  if new.grade_level_snapshot = '' then
+    raise exception 'الصف الدراسي مطلوب لإنشاء الاختبار'
+      using errcode = '23514';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists exams_require_grade_snapshot_before_insert on public.exams;
+create trigger exams_require_grade_snapshot_before_insert
+  before insert on public.exams
+  for each row execute function public.exams_require_grade_snapshot();
 
 -- ============================================================
 -- تفعيل Row Level Security على الجداول الأربعة

@@ -210,11 +210,17 @@ async function handleSubmit(event) {
     return;
   }
 
+  if (!grade) {
+    showFormError(errorBox, 'الصف الدراسي مطلوب. أدخل الصف أو المستوى قبل حفظ المادة.');
+    gradeInput.focus();
+    return;
+  }
+
   setButtonBusy(saveButton, true, editingId ? 'جارٍ حفظ التعديلات...' : 'جارٍ حفظ المادة...');
 
   try {
     // لا نرسل user_id إطلاقاً؛ قاعدة البيانات تضبطه من الجلسة.
-    const payload = { name, grade_level: grade || null };
+    const payload = { name, grade_level: grade };
 
     const result = editingId
       ? await supabase.from('subjects').update(payload).eq('id', editingId).select('id')
