@@ -178,10 +178,56 @@ create trigger questions_validate_before_write
   for each row execute function public.questions_validate_row();
 
 -- ============================================================
--- حماية snapshot داخل exam_questions من التعديل بعد الحفظ.
--- الحذف المتسلسل للاختبار، وتحويل question_id إلى NULL عند حذف
--- السؤال الأصلي، لا يغيّران snapshot ولذلك يمرّان بأمان.
+-- حماية البيانات التاريخية بعد الحفظ:
+-- 1) snapshot اسم المادة والصف داخل exams لا يتغير بعد الإنشاء،
+--    وsubject_id يثبت بعد الإنشاء.
+--    الاستثناء الوحيد: تحويل UUID إلى NULL عند حذف المادة الأصلية
+--    فعلياً عبر ON DELETE SET NULL؛ لا يُسمح بإعادة الربط لاحقاً.
+-- 2) snapshot السؤال وترتيبه وارتباطه داخل exam_questions
+--    لا تتغير بعد الحفظ.
+--    يسمح فقط بتحويل question_id من UUID إلى NULL عند حذف
+--    السؤال الأصلي بسبب ON DELETE SET NULL.
 -- ============================================================
+create or replace function public.exams_protect_snapshots()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if new.subject_name_snapshot is distinct from old.subject_name_snapshot
+     or new.grade_level_snapshot is distinct from old.grade_level_snapshot then
+    raise exception 'لا يمكن تعديل اسم المادة أو الصف التاريخي بعد إنشاء الاختبار'
+      using errcode = '42501';
+  end if;
+
+  -- subject_id ثابت بعد الإنشاء.
+  -- الاستثناء الوحيد: UUID -> NULL الناتج عن ON DELETE SET NULL
+  -- بعد حذف المادة الأصلية فعلياً. أي UUID آخر أو إعادة ربط مرفوضة.
+  if new.subject_id is distinct from old.subject_id then
+    if new.subject_id is not null then
+      raise exception 'لا يمكن تغيير subject_id بعد إنشاء الاختبار'
+        using errcode = '42501';
+    end if;
+
+    if exists (
+      select 1
+      from public.subjects s
+      where s.id = old.subject_id
+    ) then
+      raise exception 'لا يمكن تحويل subject_id إلى NULL يدوياً؛ يُسمح بذلك فقط عند حذف المادة الأصلية'
+        using errcode = '42501';
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists exams_protect_snapshots on public.exams;
+create trigger exams_protect_snapshots
+  before update on public.exams
+  for each row execute function public.exams_protect_snapshots();
+
 create or replace function public.exam_questions_protect_snapshot()
 returns trigger
 language plpgsql
@@ -192,6 +238,23 @@ begin
     raise exception 'لا يمكن تعديل النسخة التاريخية للسؤال بعد حفظ الاختبار'
       using errcode = '42501';
   end if;
+
+  if new.position is distinct from old.position then
+    raise exception 'لا يمكن تغيير ترتيب السؤال داخل الاختبار المحفوظ'
+      using errcode = '42501';
+  end if;
+
+  if new.exam_id is distinct from old.exam_id then
+    raise exception 'لا يمكن نقل السؤال المحفوظ إلى اختبار آخر'
+      using errcode = '42501';
+  end if;
+
+  if new.question_id is distinct from old.question_id
+     and new.question_id is not null then
+    raise exception 'لا يمكن استبدال السؤال الأصلي المرتبط بالنسخة المحفوظة'
+      using errcode = '42501';
+  end if;
+
   return new;
 end;
 $$;
@@ -293,23 +356,23 @@ create policy exams_select_own on public.exams
   for select to authenticated
   using (auth.uid() = user_id);
 
--- إضافة اختبار بشرط ملكية المادة، وأن تكون snapshots الاسم والصف
--- مأخوذة فعلياً من المادة المملوكة للمستخدم وقت الإنشاء.
+-- إضافة اختبار بشرط وجود مادة يملكها المستخدم وقت الإنشاء،
+-- وأن تكون snapshots الاسم والصف مأخوذة فعلياً منها.
+-- subject_id يبقى قابلاً لـ NULL في الجدول فقط لدعم ON DELETE SET NULL
+-- عند حذف المادة لاحقاً، ولا يُسمح بإدراج اختبار جديد بدونه.
 drop policy if exists exams_insert_own on public.exams;
 create policy exams_insert_own on public.exams
   for insert to authenticated
   with check (
     auth.uid() = user_id
-    and (
-      subject_id is null
-      or exists (
-        select 1
-        from public.subjects s
-        where s.id = exams.subject_id
-          and s.user_id = auth.uid()
-          and s.name = exams.subject_name_snapshot
-          and coalesce(s.grade_level, '') = coalesce(exams.grade_level_snapshot, '')
-      )
+    and exams.subject_id is not null
+    and exists (
+      select 1
+      from public.subjects s
+      where s.id = exams.subject_id
+        and s.user_id = auth.uid()
+        and s.name = exams.subject_name_snapshot
+        and coalesce(s.grade_level, '') = coalesce(exams.grade_level_snapshot, '')
     )
   );
 

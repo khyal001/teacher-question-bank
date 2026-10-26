@@ -77,7 +77,7 @@
 
 - الجداول: `subjects`, `questions`, `exams`, `exam_questions`.
 - القيود والمفاتيح الأجنبية والفهارس.
-- Trigger-ان: للتحقق من قواعد تخزين الأسئلة، وحماية `snapshot` داخل `exam_questions` من التعديل بعد الحفظ.
+- ثلاثة Triggers: للتحقق من قواعد تخزين الأسئلة، وحماية `subject_name_snapshot` و`grade_level_snapshot` في `exams`، وتثبيت `snapshot` و`position` و`exam_id` و`question_id` في `exam_questions` بعد الحفظ.
 - 16 سياسة RLS (أربع لكل جدول) بصلاحية `TO authenticated`.
 - الصلاحيات الأساسية للجداول.
 
@@ -371,6 +371,16 @@ where exam_id = 'UUID_EXAM';
 ```
 
 يجب أن يفشل التعديل برسالة «لا يمكن تعديل النسخة التاريخية للسؤال بعد حفظ الاختبار».
+
+### حماية إضافية للسجلات المحفوظة
+
+- لا يمكن إدراج اختبار جديد بدون `subject_id` يملكه المعلم، ولا بد أن يطابق اسم المادة والصف قيمة snapshot وقت الإنشاء.
+- لا يمكن تحويل `subject_id` إلى `NULL` يدوياً؛ يصبح `NULL` فقط عند حذف المادة الأصلية عبر `ON DELETE SET NULL`.
+- لا يمكن تغيير `subject_name_snapshot` أو `grade_level_snapshot` بعد إنشاء الاختبار.
+- لا يمكن تغيير `snapshot` أو `position` أو `exam_id` في `exam_questions` بعد الحفظ.
+- لا يمكن استبدال `question_id` بسؤال أصلي آخر؛ يُسمح فقط بتحويله إلى `NULL` عند حذف السؤال الأصلي.
+- حذف السؤال الأصلي يترك snapshot كما هو ويحوّل `question_id` إلى `NULL`.
+- حذف المادة يترك الاختبار وsnapshots كما هي ويحوّل `exams.subject_id` إلى `NULL`.
 
 ---
 
