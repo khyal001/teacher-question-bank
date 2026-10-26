@@ -1,3 +1,4 @@
+import { runLibraryExamTests } from './library-exam-tests.mjs';
 import { runAdminTests } from './admin-tests.mjs';
 import { runHardeningTests } from './hardening-tests.mjs';
 import { runPrepublishTests } from './prepublish-tests.mjs';
@@ -71,7 +72,7 @@ await testAsync('توزيع 10 درجات على 7 أسئلة يساوي 10.00 �
   assert.equal(utils.sumPoints(points), 10);
   assert.equal(utils.pointsMatch(10, points), true);
   assert.equal(utils.remainingPoints(10, points), 0);
-  assert.deepEqual(points, [1.43, 1.43, 1.43, 1.43, 1.43, 1.43, 1.42]);
+  assert.deepEqual(points, [2, 2, 2, 1, 1, 1, 1]);
 });
 
 await testAsync('توزيع 0.05 على 5 أسئلة يعطي 0.01 لكل سؤال', () => {
@@ -111,7 +112,7 @@ await testAsync('اختيار تخطيط MCQ تلقائياً مع إمكاني�
   assert.equal(utils.chooseMcqLayout(['أ', 'ب'], 'full'), 'full');
 });
 
-await testAsync('عناوين الأنواع المتجاورة تتبع position والترقيم المتسلسل', () => {
+await testAsync('كل نوع يظهر مرة واحدة مع ترقيم متسلسل وترتيب داخلي ثابت', () => {
   const sections = utils.buildExamSections([
     { id: 'a', position: 2, snapshot: { type: 'true_false', points: '1' } },
     { id: 'b', position: 1, snapshot: { type: 'mcq', points: '2' } },
@@ -120,7 +121,7 @@ await testAsync('عناوين الأنواع المتجاورة تتبع positio
 
   assert.deepEqual(
     sections.map((section) => section.type),
-    ['mcq', 'true_false', 'short'],
+    ['true_false', 'mcq', 'short'],
   );
   assert.deepEqual(
     sections.flatMap((section) => section.items.map((item) => item.displayNumber)),
@@ -183,6 +184,7 @@ const dynamicIds = new Set([
   'remaining-points',
   'points-status',
   'points-total',
+  'preview-total-value',
 ]);
 
 test('كل getElementById ثابت له عنصر في صفحته', () => {
@@ -283,7 +285,7 @@ test('بنك الأسئلة لا يقرأ أو يكتب الدرجات أو ال
 test('منشئ الاختبار لا يستخدم المدة ولا الصف الدراسي', () => {
   const builder = read(path.join('js', 'exam-builder.js'));
   assert.doesNotMatch(builder, /duration_minutes|durationMinutes|المدة/);
-  assert.doesNotMatch(builder, /grade_level|gradeLevel/);
+  assert.doesNotMatch(builder, /grade_level(?!_snapshot)|gradeLevel/); // read-only historical fallback is intentional
   assert.match(builder, /p_total_points/);
   assert.match(builder, /p_questions/);
 });
@@ -501,6 +503,7 @@ await runHardeningTests({ test, testAsync, read, utils, schema, migration });
 await runAdminTests({ test, testAsync, read, fullSchema, migration });
 await runPrepublishTests({ test, testAsync, read, fullSchema });
 await runQuestionPageTests({ test, testAsync, read, fullSchema });
+await runLibraryExamTests({ test, testAsync, read, utils, fullSchema });
 
 fs.rmSync(tempRoot, { recursive: true, force: true });
 

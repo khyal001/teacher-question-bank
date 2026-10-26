@@ -1,3 +1,4 @@
+import { createLibraryPage } from './library-page.js';
 import { renderLetterhead } from './letterhead-utils.js';
 import { fetchAll } from './data-utils.js';
 import { createSignedUrlCache, waitForPrintAssets } from './data-utils.js';
@@ -55,6 +56,7 @@ const printNoticeContinue = document.getElementById('print-notice-continue');
 const printNoticeClose = document.getElementById('print-notice-close');
 const printNoticeCloseX = document.getElementById('print-notice-close-x');
 
+const page = createLibraryPage('exams', examsList, () => loadExamList());
 let currentUser = null;
 let currentExam = null;
 let currentRows = [];
@@ -73,15 +75,17 @@ async function init() {
   currentUser = await requireAuth();
   if (!currentUser) return;
 
-  initNav('exams', currentUser);
   bindEvents();
 
   if (examId) {
+    initNav('exams', currentUser);
     await loadExam();
   } else {
     examSection.hidden = true;
     examsListSection.hidden = false;
-    await loadExamList();
+    const bootstrap = loadExamList(true);
+    initNav('exams', currentUser, { rolePromise: bootstrap.then((data) => data?.metadata?.role || 'teacher') });
+    await bootstrap;
   }
 
   try {
@@ -157,7 +161,7 @@ async function loadExam() {
 
     const { data: rows, error: rowsError } = await fetchAll(supabase
       .from('exam_questions')
-      .select('id, question_id, position, snapshot')
+      .select('id, question_id, position, snapshot', { count: 'exact' })
       .eq('exam_id', examId)
       .order('position', { ascending: true }), ['id']);
 
@@ -331,7 +335,9 @@ function renderSection(section) {
   if (section.type === 'true_false') heading = TF_INSTRUCTION;
   if (section.type === 'mcq') heading = MCQ_INSTRUCTION;
 
-  block.appendChild(h('h2', { class: 'exam-section-heading', text: heading }));
+  const sectionHead = h('div', { class: 'exam-section-title' }, h('h2', { class: 'exam-section-heading', text: heading }));
+  if (section.type !== 'short') sectionHead.appendChild(h('span', { class: 'exam-grade-left', text: `${formatPoints(totalFromRows(section.items.map((entry) => entry.row)))} درجة` }));
+  block.appendChild(sectionHead);
 
   if (section.type === 'mcq') {
     const list = h('div', { class: 'exam-mcq-list' });
@@ -357,12 +363,10 @@ function renderSection(section) {
 }
 
 function questionPrefix(entry) {
-  const points = snapshotPoints(entry.row);
   return h(
     'span',
     { class: 'exam-q-number' },
     h('strong', { text: `${entry.displayNumber}.` }),
-    points > 0 ? h('span', { class: 'exam-q-points', text: `(${formatPoints(points)})` }) : null,
   );
 }
 
@@ -422,6 +426,7 @@ function renderShortQuestion(entry) {
   const item = h(
     'div',
     { class: 'exam-short-item' },
+    h('div', { class: 'exam-short-grade' }, h('span', { class: 'exam-grade-left', text: `${formatPoints(points)} درجة` })),
     h(
       'p',
       { class: 'exam-short-text' },
@@ -511,21 +516,17 @@ function answerKeyText(snapshot) {
 // ------------------------------------------------------------
 // قائمة الاختبارات
 // ------------------------------------------------------------
-async function loadExamList() {
-  const { data, error } = await fetchAll(supabase
-    .from('exams')
-    .select('id, title, subject_name_snapshot, grade_level_snapshot, total_points, group_names_snapshot, created_at')
-    .eq('user_id', currentUser.id)
-    .order('created_at', { ascending: false }), ['id']);
-
-  if (error) {
-    examsCount.textContent = '—';
+async function loadExamList(includeMetadata = false) {
+  let data;
+  try {
+    data = await page.load(includeMetadata);
+    if (!data) return null;
+  } catch (error) {
     renderInlineError(examsList, friendlyError(error));
-    return;
+    return null;
   }
-
-  const exams = data || [];
-  examsCount.textContent = `${exams.length} اختبار`;
+  const exams = data.items;
+  examsCount.textContent = `${page.total} اختبار`;
   examsList.replaceChildren();
 
   if (exams.length === 0) {
@@ -538,12 +539,15 @@ async function loadExamList() {
         'إنشاء أول اختبار',
       ),
     });
-    return;
+    page.rendered();
+    return data;
   }
 
   for (const exam of exams) {
     examsList.appendChild(renderExamListItem(exam));
   }
+  page.rendered();
+  return data;
 }
 
 function renderExamListItem(exam) {
@@ -566,7 +570,7 @@ function renderExamListItem(exam) {
         h('span', { text: `${formatPoints(exam.total_points)} درجة` }),
         groups.length > 0
           ? h('span', { class: 'exam-list-groups', text: groups.join('، ') })
-          : h('span', { class: 'muted', text: 'بدون صفوف وفصول وأقسام' }),
+          : h('span', { class: 'muted', text: historicalGrade(exam) || 'بدون صفوف وفصول وأقسام' }),
         h('span', { class: 'dot', 'aria-hidden': 'true', text: '•' }),
         h('span', { text: formatDate(exam.created_at, true) }),
       ),
@@ -575,6 +579,8 @@ function renderExamListItem(exam) {
       'div',
       { class: 'row-actions' },
       h('a', { class: 'btn btn-primary btn-sm', href: `./exam-view.html?id=${encodeURIComponent(exam.id)}` }, 'فتح'),
+      h('a', { class: 'btn btn-secondary btn-sm', href: `./exam-builder.html?source=${encodeURIComponent(exam.id)}&mode=edit` }, 'تعديل'),
+      h('a', { class: 'btn btn-secondary btn-sm', href: `./exam-builder.html?source=${encodeURIComponent(exam.id)}&mode=copy` }, 'نسخ'),
       h(
         'button',
         { class: 'btn btn-danger-ghost btn-sm', type: 'button', onclick: () => deleteExam(exam) },

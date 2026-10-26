@@ -93,7 +93,7 @@
           <div class="field">
             <label for="exam-total-points">إجمالي درجات الاختبار <span class="req">*</span></label>
             <input id="exam-total-points" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="مثال: 20" required>
-            <p class="form-hint">توزّع الدرجات تلقائياً على الأسئلة بعد التوليد، ويجب أن يساوي مجموعها هذا الرقم قبل الحفظ.</p>
+            <p class="form-hint">توزّع الدرجات الصحيحة على الأسئلة، ويبدأ الباقي من السؤال الأول. إذا كان الإجمالي كسريًا أو أقل من عدد الأسئلة تُستخدم الكسور للحفاظ على درجة موجبة لكل سؤال. يمكنك تعديلها يدويًا.</p>
           </div>
 
           <div class="field">
@@ -105,25 +105,14 @@
           <fieldset class="count-fieldset">
             <legend>عدد الأسئلة المطلوبة <span class="req">*</span></legend>
 
-            <div class="count-grid">
-              <div class="count-field">
-                <label for="count-easy">سهل</label>
-                <input id="count-easy" type="number" min="0" step="1" value="0" inputmode="numeric">
-                <span class="available-hint" id="available-easy">المتاح: —</span>
-              </div>
-
-              <div class="count-field">
-                <label for="count-medium">متوسط</label>
-                <input id="count-medium" type="number" min="0" step="1" value="0" inputmode="numeric">
-                <span class="available-hint" id="available-medium">المتاح: —</span>
-              </div>
-
-              <div class="count-field">
-                <label for="count-hard">صعب</label>
-                <input id="count-hard" type="number" min="0" step="1" value="0" inputmode="numeric">
-                <span class="available-hint" id="available-hard">المتاح: —</span>
-              </div>
-            </div>
+            <div class="distribution-scroll"><table class="distribution-table">
+              <caption>حدّد العدد لكل نوع وصعوبة. ضع صفرًا للنوع الذي لا تريده.</caption>
+              <thead><tr><th scope="col">النوع</th><th scope="col">سهل</th><th scope="col">متوسط</th><th scope="col">صعب</th></tr></thead>
+              <tbody><tr><th scope="row">صح / خطأ</th><td><input id="count-true_false-easy" aria-label="صح / خطأ — سهل" type="number" min="0" step="1" value="0" inputmode="numeric"><small id="available-true_false-easy">المتاح: —</small></td><td><input id="count-true_false-medium" aria-label="صح / خطأ — متوسط" type="number" min="0" step="1" value="0" inputmode="numeric"><small id="available-true_false-medium">المتاح: —</small></td><td><input id="count-true_false-hard" aria-label="صح / خطأ — صعب" type="number" min="0" step="1" value="0" inputmode="numeric"><small id="available-true_false-hard">المتاح: —</small></td></tr>
+<tr><th scope="row">اختيار من متعدد</th><td><input id="count-mcq-easy" aria-label="اختيار من متعدد — سهل" type="number" min="0" step="1" value="0" inputmode="numeric"><small id="available-mcq-easy">المتاح: —</small></td><td><input id="count-mcq-medium" aria-label="اختيار من متعدد — متوسط" type="number" min="0" step="1" value="0" inputmode="numeric"><small id="available-mcq-medium">المتاح: —</small></td><td><input id="count-mcq-hard" aria-label="اختيار من متعدد — صعب" type="number" min="0" step="1" value="0" inputmode="numeric"><small id="available-mcq-hard">المتاح: —</small></td></tr>
+<tr><th scope="row">إجابة قصيرة</th><td><input id="count-short-easy" aria-label="إجابة قصيرة — سهل" type="number" min="0" step="1" value="0" inputmode="numeric"><small id="available-short-easy">المتاح: —</small></td><td><input id="count-short-medium" aria-label="إجابة قصيرة — متوسط" type="number" min="0" step="1" value="0" inputmode="numeric"><small id="available-short-medium">المتاح: —</small></td><td><input id="count-short-hard" aria-label="إجابة قصيرة — صعب" type="number" min="0" step="1" value="0" inputmode="numeric"><small id="available-short-hard">المتاح: —</small></td></tr>
+</tbody>
+            </table></div>
 
             <p class="availability-note" id="availability-note">اختر المادة والصفوف والفصول والأقسام لعرض الأسئلة المتاحة.</p>
           </fieldset>
@@ -158,7 +147,7 @@
 
         <div class="preview-actions" id="preview-actions" hidden>
           <button class="btn btn-primary" id="save-exam-btn" type="button">حفظ الاختبار</button>
-          <button class="btn btn-outline" id="redistribute-btn" type="button">توزيع الدرجات بالتساوي</button>
+          <button class="btn btn-outline" id="redistribute-btn" type="button">إعادة توزيع الدرجات</button>
           <button class="btn btn-ghost" id="regenerate-btn" type="button">إعادة التوليد</button>
           <button class="btn btn-ghost" id="cancel-preview-btn" type="button">إلغاء المعاينة</button>
         </div>

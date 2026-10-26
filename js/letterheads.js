@@ -1,5 +1,5 @@
 import { DEFAULT_LETTERHEAD_LAYOUT, layoutError, renderLetterhead } from './letterhead-utils.js';
-import { fetchAll } from './data-utils.js';
+import { batchSigner, createLibraryPage } from './library-page.js';
 import { createSignedUrlCache } from './data-utils.js';
 // إدارة قوالب الكليشة والشعارات الخاصة في Supabase Storage.
 import { supabase } from './supabase.js';
@@ -46,6 +46,9 @@ const removeLogoButton = document.getElementById('remove-logo-btn');
 const errorBox = document.getElementById('letterhead-error');
 const saveButton = document.getElementById('save-letterhead-btn');
 
+const page = createLibraryPage('letterheads', letterheadsList, () => loadLetterheads());
+const logoSlots = new Map();
+let logoObserver = null;
 let currentUser = null;
 let letterheads = [];
 let editing = null;
@@ -54,11 +57,17 @@ let removeCurrentLogo = false;
 let objectPreviewUrl = null;
 let dialogVersion = 0;
 let saving = false;
-const signedUrlCache = createSignedUrlCache(async (path, ttl) => {
-  const { data, error } = await supabase.storage.from(ASSET_BUCKET).createSignedUrl(path, ttl);
+const signedUrlCache = createSignedUrlCache(batchSigner(async (paths, ttl) => {
+  const started = performance.now();
+  const { data, error } = await supabase.storage.from(ASSET_BUCKET).createSignedUrls(paths, ttl);
   if (error) throw error;
-  return data.signedUrl;
-});
+  if (new URLSearchParams(window.location.search).get('measure') === '1') {
+    letterheadsList.dataset.signingMs = String(Math.round(performance.now() - started));
+    letterheadsList.dataset.signingRequests = String(Number(letterheadsList.dataset.signingRequests || 0) + 1);
+    letterheadsList.dataset.signedPaths = String(paths.length);
+  }
+  return new Map((data || []).filter((row) => row.signedUrl && !row.error).map((row) => [row.path, row.signedUrl]));
+}));
 
 init();
 
@@ -66,13 +75,45 @@ async function init() {
   currentUser = await requireAuth();
   if (!currentUser) return;
 
-  initNav('letterheads', currentUser);
   bindEvents();
-  await loadLetterheads();
-  window.addEventListener('focus', () => {
-    Promise.all(letterheads.filter((row) => row.logo_path).map((row) => getSignedLogoUrl(row.logo_path)))
-      .then(renderLetterheads);
-  });
+  const bootstrap = loadLetterheads(true);
+  initNav('letterheads', currentUser, { rolePromise: bootstrap.then((data) => data?.metadata?.role || 'teacher') });
+  await bootstrap;
+  window.addEventListener('focus', refreshVisibleLogos);
+}
+
+function refreshVisibleLogos() {
+  for (const [slot, row] of logoSlots) {
+    const rect = slot.getBoundingClientRect();
+    if (rect.bottom >= 0 && rect.top <= window.innerHeight) loadCardLogo(slot, row);
+  }
+}
+
+async function loadCardLogo(slot, row) {
+  if (slot.dataset.loading === 'true') return;
+  const cached = signedUrlCache.peek(row.logo_path);
+  if (cached && slot.dataset.url === cached) return;
+  slot.dataset.loading = 'true';
+  try {
+    const url = await signedUrlCache.get(row.logo_path);
+    if (!slot.isConnected || logoSlots.get(slot) !== row) return;
+    slot.replaceChildren(renderLetterhead(row, url, h));
+    slot.dataset.url = url;
+    if (new URLSearchParams(window.location.search).get('measure') === '1') {
+      const image = slot.querySelector('img');
+      const loaded = () => {
+        if (image?.naturalWidth && slot.isConnected) {
+          slot.dataset.logoReadyMs = String(Math.round(performance.now()));
+        }
+      };
+      if (image?.complete) loaded();
+      else image?.addEventListener('load', loaded, { once: true });
+    }
+  } catch {
+    if (slot.isConnected) slot.setAttribute('aria-label', 'تعذر تحميل الشعار؛ أعد المحاولة عند الرجوع للصفحة.');
+  } finally {
+    delete slot.dataset.loading;
+  }
 }
 
 function bindEvents() {
@@ -94,30 +135,19 @@ function bindEvents() {
   removeLogoButton.addEventListener('click', handleRemoveLogo);
 }
 
-async function loadLetterheads() {
-  const { data, error } = await fetchAll(supabase
-    .from('letterheads')
-    .select(
-      'id, name, entity_name, school_name, university_name, college_name, department_name, extra_text, logo_path, layout, created_at',
-    )
-    .eq('user_id', currentUser.id)
-    .order('created_at', { ascending: false }), ['id']);
-
-  if (error) {
+async function loadLetterheads(includeMetadata = false) {
+  try {
+    const data = await page.load(includeMetadata);
+    if (!data) return null;
+    letterheads = data.items;
+    renderLetterheads();
+    page.rendered();
+    return data;
+  } catch (error) {
     letterheadsCount.textContent = '—';
     renderInlineError(letterheadsList, friendlyError(error));
-    return;
+    return null;
   }
-
-  letterheads = data || [];
-
-  await Promise.all(
-    letterheads
-      .filter((row) => row.logo_path)
-      .map((row) => getSignedLogoUrl(row.logo_path)),
-  );
-
-  renderLetterheads();
 }
 
 async function getSignedLogoUrl(path) {
@@ -130,7 +160,9 @@ async function getSignedLogoUrl(path) {
 }
 
 function renderLetterheads() {
-  letterheadsCount.textContent = `${letterheads.length} قالب`;
+  letterheadsCount.textContent = `${page.total} قالب`;
+  logoObserver?.disconnect();
+  logoSlots.clear();
   letterheadsList.replaceChildren();
 
   if (letterheads.length === 0) {
@@ -151,15 +183,26 @@ function renderLetterheads() {
     grid.appendChild(renderLetterheadCard(letterhead));
   }
   letterheadsList.appendChild(grid);
+  if ('IntersectionObserver' in window) {
+    logoObserver = new IntersectionObserver((entries) => {
+      for (const entry of entries) if (entry.isIntersecting) loadCardLogo(entry.target, logoSlots.get(entry.target));
+    });
+    for (const slot of logoSlots.keys()) logoObserver.observe(slot);
+  } else refreshVisibleLogos();
 }
 
 function renderLetterheadCard(letterhead) {
   const logoUrl = letterhead.logo_path ? signedUrlCache.peek(letterhead.logo_path) : null;
 
+  const slot = h('div', { class: 'letterhead-card-preview' }, renderLetterhead(letterhead, logoUrl, h));
+  if (letterhead.logo_path) {
+    logoSlots.set(slot, letterhead);
+    if (logoUrl) slot.dataset.url = logoUrl;
+  }
   return h(
     'article',
     { class: 'letterhead-card' },
-    h('div', { class: 'letterhead-card-preview' }, renderLetterhead(letterhead, logoUrl, h)),
+    slot,
     h(
       'div',
       { class: 'letterhead-card-body' },
@@ -383,8 +426,6 @@ async function handleSubmit(event) {
 
     if (result.error) throw result.error;
 
-
-    signedUrlCache.clear();
     if (submitVersion === dialogVersion) closeDialog();
     toast(targetId ? 'تم حفظ تعديلات قالب الكليشة.' : 'تمت إضافة قالب الكليشة.');
     await loadLetterheads();
@@ -428,7 +469,6 @@ async function confirmDelete(letterhead) {
     if (error) throw error;
 
     // Deleting a template never deletes its immutable uploaded logo.
-    signedUrlCache.clear();
     toast('تم حذف قالب الكليشة.');
     await loadLetterheads();
   } catch (error) {

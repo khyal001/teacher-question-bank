@@ -16,6 +16,10 @@ import {
   toast,
 } from './ui.js';
 import {
+  QUESTION_TYPES,
+  draftFromExam,
+  groupDraftItems,
+  selectDistribution,
   questionAppliesToGroups,
   replacementCandidates,
   QUESTION_LAYOUT_LABELS,
@@ -50,6 +54,9 @@ const previewActions = document.getElementById('preview-actions');
 const saveButton = document.getElementById('save-exam-btn');
 const redistributeButton = document.getElementById('redistribute-btn');
 
+const sourceId = new URLSearchParams(window.location.search).get('source');
+let sourceExam = null;
+let sourceLoading = Boolean(sourceId);
 let currentUser = null;
 let subjects = [];
 let allGroups = [];
@@ -71,6 +78,7 @@ async function init() {
   initNav('builder', currentUser);
   bindEvents();
   await Promise.all([loadReferenceData(), loadLetterheads()]);
+  if (sourceId) await loadSourceDraft();
 }
 
 function bindEvents() {
@@ -86,7 +94,8 @@ function bindEvents() {
   titleInput.addEventListener('change', () => {
     if (!previewState) return;
     previewState.title = titleInput.value.trim();
-    renderPreview();
+    const title = previewArea.querySelector('.preview-title');
+    if (title) title.textContent = previewState.title;
   });
 
   totalPointsInput.addEventListener('input', () => {
@@ -104,14 +113,14 @@ function bindEvents() {
       return;
     }
     previewState.totalPoints = Number(raw);
-    renderPreview();
+    updatePointSummary();
   });
 
   letterheadSelect.addEventListener('change', () => {
     if (!previewState) return;
     previewState.letterheadId = letterheadSelect.value || null;
     previewState.letterheadName =
-      letterheads.find((item) => item.id === letterheadSelect.value)?.name || '';
+      selectedLetterheadName();
     renderPreview();
   });
 
@@ -120,6 +129,8 @@ function bindEvents() {
   });
 
   form.addEventListener('submit', handleGenerate);
+  const appendButton = h('button', { type: 'button', class: 'btn btn-secondary btn-block', onclick: () => handleGenerate({ preventDefault() {} }, true) }, 'إضافة التوزيع إلى المعاينة الحالية');
+  form.appendChild(appendButton);
   document.getElementById('regenerate-btn').addEventListener('click', () => form.requestSubmit());
   document.getElementById('cancel-preview-btn').addEventListener('click', clearPreview);
   redistributeButton.addEventListener('click', redistributePointsEvenly);
@@ -133,17 +144,17 @@ async function loadReferenceData() {
   const [subjectsResult, groupsResult, linksResult] = await Promise.all([
     fetchAll(supabase
       .from('subjects')
-      .select('id, name')
+      .select('id, name', { count: 'exact' })
       .eq('user_id', currentUser.id)
       .order('name', { ascending: true }), ['id']),
     fetchAll(supabase
       .from('teaching_groups')
-      .select('id, name')
+      .select('id, name', { count: 'exact' })
       .eq('user_id', currentUser.id)
       .order('name', { ascending: true }), ['id']),
     fetchAll(supabase
       .from('subject_groups')
-      .select('subject_id, group_id')
+      .select('subject_id, group_id', { count: 'exact' })
       .eq('user_id', currentUser.id), ['subject_id', 'group_id']),
   ]);
 
@@ -185,7 +196,7 @@ async function loadReferenceData() {
 async function loadLetterheads() {
   const { data, error } = await fetchAll(supabase
     .from('letterheads')
-    .select('id, name')
+    .select('id, name', { count: 'exact' })
     .eq('user_id', currentUser.id)
     .order('name', { ascending: true }), ['id']);
 
@@ -269,12 +280,14 @@ function renderExamGroups() {
 }
 
 function selectedGroupIds() {
+  if (sourceExam) return sourceExam.group_ids_snapshot || [];
   return Array.from(examGroups.querySelectorAll('input[name="exam-group"]:checked')).map(
     (input) => input.value,
   );
 }
 
 function selectedGroupNames() {
+  if (sourceExam) return sourceExam.group_names_snapshot || [];
   return selectedGroupIds()
     .map((groupId) => allGroups.find((group) => group.id === groupId)?.name)
     .filter(Boolean);
@@ -293,23 +306,15 @@ async function loadSubjectQuestions() {
 
   availabilityNote.textContent = 'جارٍ تحميل الأسئلة المتاحة...';
 
-  const [questionsResult, linksResult] = await Promise.all([
-    fetchAll(supabase
-      .from('questions')
-      .select(
-        'id, subject_id, unit, type, question_text, options, correct_answer, difficulty, group_scope',
-      )
-      .eq('user_id', currentUser.id)
-      .eq('subject_id', subjectId), ['id']),
-    fetchAll(supabase
-      .from('question_groups')
-      .select('question_id, group_id')
-      .eq('user_id', currentUser.id), ['question_id', 'group_id']),
-  ]);
+  const questionsResult = await fetchAll(supabase
+    .from('questions')
+    .select('id, subject_id, unit, type, question_text, options, correct_answer, difficulty, group_scope, question_groups(group_id)', { count: 'exact' })
+    .eq('user_id', currentUser.id)
+    .eq('subject_id', subjectId), ['id']);
 
   if (token !== questionsToken) return;
 
-  const error = questionsResult.error || linksResult.error;
+  const error = questionsResult.error;
   if (error) {
     availabilityNote.textContent = 'تعذر تحميل الأسئلة.';
     showFormError(errorBox, friendlyError(error));
@@ -318,9 +323,8 @@ async function loadSubjectQuestions() {
 
   subjectQuestions = questionsResult.data || [];
 
-  for (const link of linksResult.data || []) {
-    if (!questionGroupLinks.has(link.question_id)) questionGroupLinks.set(link.question_id, new Set());
-    questionGroupLinks.get(link.question_id).add(link.group_id);
+  for (const question of subjectQuestions) {
+    questionGroupLinks.set(question.id, new Set((question.question_groups || []).map((link) => link.group_id)));
   }
 
   applyGroupFilter();
@@ -342,8 +346,9 @@ function updateAvailability() {
     if (question.difficulty in counts) counts[question.difficulty] += 1;
   }
 
-  for (const key of ['easy', 'medium', 'hard']) {
-    document.getElementById(`available-${key}`).textContent = `المتاح: ${counts[key]}`;
+  for (const type of QUESTION_TYPES) for (const difficulty of ['easy', 'medium', 'hard']) {
+    const available = eligibleQuestions.filter((q) => q.type === type && q.difficulty === difficulty).length;
+    document.getElementById(`available-${type}-${difficulty}`).textContent = `المتاح: ${available}`;
   }
 
   const total = counts.easy + counts.medium + counts.hard;
@@ -373,8 +378,9 @@ function updateAvailability() {
 // ------------------------------------------------------------
 // التوليد
 // ------------------------------------------------------------
-function handleGenerate(event) {
+function handleGenerate(event, append = false) {
   event.preventDefault();
+  if (sourceLoading || isSaving) return;
   showFormError(errorBox, '');
 
   const subject = subjects.find((item) => item.id === subjectSelect.value);
@@ -393,11 +399,11 @@ function handleGenerate(event) {
   }
 
   const groupIds = selectedGroupIds();
-  if (groupsOfSubject(subject.id).length === 0) {
+  if (!sourceExam && groupsOfSubject(subject.id).length === 0) {
     showFormError(errorBox, NO_TEACHING_TARGET);
     return;
   }
-  if (groupIds.length === 0) {
+  if (!sourceExam && groupIds.length === 0) {
     showFormError(errorBox, 'اختر صف / فصل / قسم واحد على الأقل من صفوف وفصول وأقسام المادة.');
     examGroups.focus();
     return;
@@ -410,67 +416,23 @@ function handleGenerate(event) {
     return;
   }
 
-  const requested = {
-    easy: Number(document.getElementById('count-easy').value || 0),
-    medium: Number(document.getElementById('count-medium').value || 0),
-    hard: Number(document.getElementById('count-hard').value || 0),
-  };
-
-  for (const key of ['easy', 'medium', 'hard']) {
-    if (!Number.isInteger(requested[key]) || requested[key] < 0) {
-      showFormError(errorBox, 'أعداد الأسئلة يجب أن تكون أعداداً صحيحة غير سالبة.');
-      return;
-    }
-  }
-
-  const totalRequested = requested.easy + requested.medium + requested.hard;
-  if (totalRequested < 1) {
-    showFormError(errorBox, 'حدّد سؤالاً واحداً على الأقل.');
-    return;
-  }
-
-  if (eligibleQuestions.length === 0) {
-    showFormError(errorBox, 'لا توجد أسئلة مطابقة للمادة والصفوف والفصول والأقسام المختارة.');
-    return;
-  }
-
-  const available = { easy: 0, medium: 0, hard: 0 };
-  for (const question of eligibleQuestions) {
-    if (question.difficulty in available) available[question.difficulty] += 1;
-  }
-
-  const insufficient = ['easy', 'medium', 'hard'].filter(
-    (key) => requested[key] > available[key],
-  );
-
-  if (insufficient.length > 0) {
-    showFormError(
-      errorBox,
-      `لا يوجد عدد كافٍ من الأسئلة. المتاح: سهل (${available.easy})، متوسط (${available.medium})، صعب (${available.hard}). ` +
-        `المطلوب: سهل (${requested.easy})، متوسط (${requested.medium})، صعب (${requested.hard}). ` +
-        'قلّل الأعداد المطلوبة أو أضف أسئلة جديدة.',
-    );
-    return;
-  }
-
+  let selected;
   let points;
-
   try {
-    points = distributePoints(totalPoints, totalRequested);
+    if (append && !previewState) throw new Error('ولّد معاينة أو افتح اختبارًا محفوظًا أولًا.');
+    const requested = Object.fromEntries(QUESTION_TYPES.map((type) => [type,
+      Object.fromEntries(['easy', 'medium', 'hard'].map((difficulty) => [difficulty,
+        Number(document.getElementById(`count-${type}-${difficulty}`).value || 0)])),
+    ]));
+    const used = new Set(append ? previewState.items.map((item) => item.question.id) : []);
+    selected = selectDistribution(eligibleQuestions.filter((q) => !used.has(q.id)), requested, shuffleCopy);
+    points = append ? selected.map(() => 1) : distributePoints(totalPoints, selected.length);
   } catch (error) {
     showFormError(errorBox, error.message);
     return;
   }
-
-  const selected = [];
-
-  for (const key of ['easy', 'medium', 'hard']) {
-    const pool = shuffleCopy(eligibleQuestions.filter((question) => question.difficulty === key));
-    selected.push(...pool.slice(0, requested[key]));
-  }
-
-  const ordered = shuffleCopy(selected);
-  const items = ordered.map((question, index) => buildItem(question, points[index]));
+  const generated = selected.map((question, index) => buildItem(question, points[index]));
+  const items = groupDraftItems(append ? [...previewState.items, ...generated] : generated);
 
   previewState = {
     subject,
@@ -479,7 +441,7 @@ function handleGenerate(event) {
     groupNames: selectedGroupNames(),
     totalPoints: Number(totalPoints),
     letterheadId: letterheadSelect.value || null,
-    letterheadName: letterheads.find((item) => item.id === letterheadSelect.value)?.name || '',
+    letterheadName: selectedLetterheadName(),
     closingPhrase: closingInput.value.trim(),
     items,
   };
@@ -548,7 +510,7 @@ function renderPreview() {
       'div',
       { class: 'preview-stats' },
       h('span', { class: 'preview-stat' }, h('strong', { text: String(items.length) }), ' سؤال'),
-      h('span', { class: 'preview-stat' }, h('strong', { text: formatPoints(totalPoints) }), ' درجة إجمالية'),
+      h('span', { class: 'preview-stat' }, h('strong', { id: 'preview-total-value', text: formatPoints(totalPoints) }), ' درجة إجمالية'),
       h(
         'span',
         { class: 'preview-stat preview-stat-difficulty' },
@@ -619,6 +581,12 @@ function renderPreviewQuestion(item, index) {
     h(
       'div',
       { class: 'preview-q-head' },
+    h('button', { type: 'button', class: 'btn btn-danger-ghost btn-sm', onclick: () => {
+      if (isSaving || !previewState) return;
+      if (previewState.items.length === 1) { toast('يجب أن يبقى سؤال واحد على الأقل.', 'error'); return; }
+      previewState.items.splice(index, 1);
+      renderPreview();
+    } }, 'إزالة'),
       h('span', { class: 'q-position', text: `سؤال ${index + 1}` }),
       h(
         'div',
@@ -703,6 +671,8 @@ function updatePointSummary() {
   const remainingElement = document.getElementById('remaining-points');
   const statusElement = document.getElementById('points-status');
   const totalElement = document.getElementById('points-total');
+  const previewTotalElement = document.getElementById('preview-total-value');
+  if (previewTotalElement) previewTotalElement.textContent = formatPoints(previewState.totalPoints);
 
   if (totalElement) {
     const totalValue = toCents(previewState.totalPoints);
@@ -773,7 +743,7 @@ function redistributePointsEvenly() {
     });
     renderPreview();
     showFormError(errorBox, '');
-    toast('تم توزيع الدرجات بالتساوي.');
+    toast('تم توزيع الدرجات مع إضافة الباقي للأسئلة الأولى.');
   } catch (error) {
     showFormError(errorBox, error.message);
   }
@@ -793,7 +763,7 @@ function clearPreview() {
 // الحفظ
 // ------------------------------------------------------------
 async function saveExam() {
-  if (!previewState || isSaving) return;
+  if (!previewState || isSaving || sourceLoading) return;
 
   const title = titleInput.value.trim();
   if (!title) {
@@ -814,7 +784,7 @@ async function saveExam() {
   previewState.totalPoints = Number(rawTotal);
   previewState.letterheadId = letterheadSelect.value || null;
   previewState.letterheadName =
-    letterheads.find((item) => item.id === letterheadSelect.value)?.name || '';
+    selectedLetterheadName();
   previewState.closingPhrase = closingInput.value.trim();
   updatePointSummary();
 
@@ -839,7 +809,8 @@ async function saveExam() {
       const question = item.question;
 
       return {
-        question_id: question.id,
+        source_row_id: item.sourceRowId || null,
+        question_id: item.sourceRowId ? null : question.id,
         position: index + 1,
         snapshot: {
           question_text: question.question_text,
@@ -854,15 +825,18 @@ async function saveExam() {
       };
     });
 
-    const { data: examId, error } = await supabase.rpc('save_exam', {
+    const settings = {
       p_title: previewState.title,
-      p_subject_id: previewState.subject.id,
       p_total_points: Number(previewState.totalPoints),
-      p_group_ids: previewState.groupIds,
-      p_letterhead_id: previewState.letterheadId,
+      p_letterhead_id: letterheadSelect.value === '_historical' ? null : previewState.letterheadId,
       p_closing_phrase: previewState.closingPhrase,
       p_questions: questionsPayload,
-    });
+    };
+    const { data: examId, error } = sourceExam
+      ? await supabase.rpc('save_exam_revision', { ...settings, p_source_exam_id: sourceExam.id,
+          p_keep_letterhead: letterheadSelect.value === '_historical' })
+      : await supabase.rpc('save_exam', { ...settings,
+          p_subject_id: previewState.subject.id, p_group_ids: previewState.groupIds });
 
     if (error) throw error;
     if (!examId) throw new Error('تعذر إنشاء الاختبار.');
@@ -896,4 +870,65 @@ function shuffleCopy(items) {
     [copy[index], copy[randomIndex]] = [copy[randomIndex], copy[index]];
   }
   return copy;
+}
+
+// Historical content is read through RLS; the write RPC independently proves
+// every inherited row belongs to this same owned source. It never updates it.
+async function loadSourceDraft() {
+  saveButton.disabled = true;
+  document.getElementById('generate-btn').disabled = true;
+  try {
+    const { data, error } = await supabase.rpc('get_exam_source', { p_exam_id: sourceId });
+    if (error) throw error;
+    if (!data?.exam) throw new Error('الاختبار غير موجود أو لا تملك صلاحية الوصول إليه.');
+    sourceExam = data.exam;
+    const subject = { id: sourceExam.subject_id || '_historical', name: sourceExam.subject_name_snapshot };
+    if (!subjects.some((row) => row.id === subject.id)) {
+      subjects.push(subject);
+      subjectSelect.appendChild(h('option', { value: subject.id }, subject.name));
+    }
+    subjectSelect.value = subject.id;
+    subjectSelect.disabled = true;
+    titleInput.value = `${sourceExam.title}${new URLSearchParams(window.location.search).get('mode') === 'copy' ? ' — نسخة' : ''}`.slice(0, 200);
+    totalPointsInput.value = String(sourceExam.total_points);
+    closingInput.value = sourceExam.closing_phrase || '';
+    letterheadSelect.prepend(h('option', { value: '_historical' }, 'كليشة الاختبار المحفوظة (بالشعار التاريخي)'));
+    letterheadSelect.value = '_historical';
+    const ids = sourceExam.group_ids_snapshot || [];
+    // Frozen source context; changing the target requires a fresh examination
+    // of eligibility, so revisions retain it and the UI explains that choice.
+    examGroups.replaceChildren(h('p', { text: (sourceExam.group_names_snapshot || []).join('، ') || sourceExam.grade_level_snapshot || 'الصف التاريخي غير مسجل' }));
+    examGroupsNote.textContent = 'تحتفظ هذه النسخة بالمادة والصفوف والفصول والأقسام التاريخية. لإنشاء اختبار لسياق مختلف ابدأ اختبارًا جديدًا.';
+    form.prepend(h('p', { class: 'form-hint', text: 'هذه مسودة جديدة من اختبار محفوظ. يمكنك تغيير العنوان والأسئلة والدرجات والكليشة والعبارة الختامية؛ يبقى الاختبار الأصلي كما هو.' }));
+    if (sourceExam.subject_id) {
+      await loadSubjectQuestions();
+      const currentGroups = new Set(groupsOfSubject(sourceExam.subject_id).map((g) => g.id));
+      const contextAvailable = ids.length > 0 && ids.every((id) => currentGroups.has(id));
+      eligibleQuestions = contextAvailable
+        ? subjectQuestions.filter((q) => questionAppliesToGroups(q, questionGroupLinks.get(q.id), ids))
+        : [];
+      updateAvailability();
+      if (!contextAvailable) availabilityNote.textContent = 'الصفوف والفصول والأقسام التاريخية لم تعد متاحة بالكامل. يمكنك تعديل الأسئلة التاريخية وحفظ نسخة جديدة، دون إضافة أسئلة من البنك لهذا السياق.';
+    }
+    previewState = { subject, title: titleInput.value, totalPoints: sourceExam.total_points,
+      groupIds: ids, groupNames: sourceExam.group_names_snapshot || [],
+      letterheadId: null, letterheadName: sourceExam.letterhead_snapshot?.name || '',
+      closingPhrase: sourceExam.closing_phrase || '', items: draftFromExam(sourceExam, data.questions) };
+    sourceLoading = false;
+    document.getElementById('generate-btn').disabled = !eligibleQuestions.length;
+    renderPreview();
+    if (!isPositivePoints(sourceExam.total_points) || previewState.items.some((item) => !isPositivePoints(item.points))) {
+      showFormError(errorBox, 'توجد درجات تاريخية بدقة تتجاوز منزلتين. تبقى قيم الأصل كما هي؛ حدّد درجات جديدة بمنزلتين كحد أقصى صراحةً قبل حفظ النسخة الجديدة.');
+    }
+  } catch (error) {
+    // A failed source load must never silently fall back to ordinary creation.
+    form.querySelectorAll('input,select,textarea,button').forEach((input) => { input.disabled = true; });
+    showFormError(errorBox, friendlyError(error));
+  }
+}
+
+function selectedLetterheadName() {
+  return letterheadSelect.value === '_historical'
+    ? sourceExam?.letterhead_snapshot?.name || 'الكليشة التاريخية'
+    : letterheads.find((item) => item.id === letterheadSelect.value)?.name || '';
 }

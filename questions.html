@@ -153,8 +153,9 @@
           <div class="field">
             <label for="question-difficulty">الصعوبة <span class="req">*</span></label>
             <select id="question-difficulty" required>
+              <option value="" selected disabled>اختر مستوى الصعوبة</option>
               <option value="easy">سهل</option>
-              <option value="medium" selected>متوسط</option>
+              <option value="medium">متوسط</option>
               <option value="hard">صعب</option>
             </select>
           </div>
@@ -166,11 +167,11 @@
 
           <div class="radio-group">
             <label class="radio-option">
-              <input type="radio" name="group-scope" value="all" checked>
+              <input type="radio" name="group-scope" value="all">
               <span>جميع صفوف وفصول وأقسام المادة</span>
             </label>
             <label class="radio-option">
-              <input type="radio" name="group-scope" value="selected">
+              <input type="radio" name="group-scope" value="selected" checked>
               <span>صفوف وفصول وأقسام محددة</span>
             </label>
           </div>

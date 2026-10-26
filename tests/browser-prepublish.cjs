@@ -41,7 +41,7 @@ const { installMock } = require('./offline-supabase-fixture.cjs');
     await page.waitForFunction(() => __calls.some((call) => call.table === 'subject_groups'
       && call.predicates.some(([key, value]) => key === 'subject_id' && value === 'subject-1') && call.finishedAt));
     assert.ok((await page.locator('#question-groups-hint').textContent()).includes('الثاني الثانوي'));
-    assert.equal(await page.locator('input[name="group-scope"][value="all"]').isChecked(), true);
+    assert.equal(await page.locator('input[name="group-scope"][value="selected"]').isChecked(), true);
     checks++;
     await page.locator('#question-dialog [data-close]').first().click();
     const callsBeforeReopen = await page.evaluate(() => __calls.length);

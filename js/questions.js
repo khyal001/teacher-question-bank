@@ -410,7 +410,7 @@ function openQuestionDialog({ question = null, duplicate = false } = {}) {
 
   unitInput.value = question?.unit || '';
   typeSelect.value = question?.type || 'mcq';
-  difficultySelect.value = question?.difficulty || 'medium';
+  difficultySelect.value = question?.difficulty || '';
   textInput.value = question?.question_text || '';
   shortAnswerInput.value = question?.type === 'short' ? question.correct_answer || '' : '';
 
@@ -418,7 +418,7 @@ function openQuestionDialog({ question = null, duplicate = false } = {}) {
     radio.checked = question?.type === 'true_false' && radio.value === question.correct_answer;
   });
 
-  setScopeRadio(question?.group_scope || 'all');
+  setScopeRadio(question?.group_scope || 'selected');
 
   if (question?.type === 'mcq' && Array.isArray(question.options)) {
     question.options.forEach((option) => {
@@ -444,7 +444,7 @@ function renderGroupScope(question = null) {
   const subjectId = subjectSelect.value;
   const groups = groupsOfSubject(subjectId);
   const selectedIds = new Set(question ? questionGroups.get(question.id) || [] : []);
-  const desiredScope = question?.group_scope || 'all';
+  const desiredScope = question?.group_scope || 'selected';
 
   questionGroupsList.replaceChildren();
 
@@ -512,7 +512,7 @@ function setScopeRadioDisabled(disabled) {
 }
 
 function currentScope() {
-  return form.querySelector('input[name="group-scope"]:checked')?.value || 'all';
+  return form.querySelector('input[name="group-scope"]:checked')?.value || 'selected';
 }
 
 function checkedQuestionGroupIds() {

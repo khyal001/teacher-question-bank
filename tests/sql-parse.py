@@ -15,6 +15,7 @@ for relative in (
     'supabase/migrations/20261027_admin_roles.sql',
     'supabase/migrations/20261028_profile_letterhead_layout.sql',
     'supabase/migrations/20261029_questions_page.sql',
+    'supabase/migrations/20261030_library_pages_exam_revisions.sql',
     'supabase/assign_first_admin.example.sql',
 ):
     sql = (root / relative).read_text(encoding='utf-8')
@@ -39,8 +40,9 @@ base = contracts['supabase/migrations/20261026_subjects_groups_sharing.sql']
 admin = contracts['supabase/migrations/20261027_admin_roles.sql']
 profile_layout = contracts['supabase/migrations/20261028_profile_letterhead_layout.sql']
 questions_page = contracts['supabase/migrations/20261029_questions_page.sql']
+library_pages = contracts['supabase/migrations/20261030_library_pages_exam_revisions.sql']
 for kind in schema:
-    assert schema[kind] == sorted(base[kind] + admin[kind] + profile_layout[kind] + questions_page[kind]), f'Schema/migration contract mismatch: {kind}'
+    assert schema[kind] == sorted(base[kind] + admin[kind] + profile_layout[kind] + questions_page[kind] + library_pages[kind]), f'Schema/migration contract mismatch: {kind}'
     print(f'AST parity {kind}: {len(schema[kind])} definitions match')
 
 

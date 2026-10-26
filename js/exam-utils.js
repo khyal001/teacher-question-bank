@@ -62,6 +62,11 @@ export function distributePoints(total, count) {
     throw new Error('إجمالي الدرجات صغير جداً لتوزيعه على عدد الأسئلة المطلوبة بدرجة موجبة لكل سؤال.');
   }
 
+  if (Number.isInteger(Number(total)) && Number(total) >= count) {
+    const base = Math.floor(Number(total) / count);
+    const remainder = Number(total) % count;
+    return Array.from({ length: count }, (_, index) => base + (index < remainder ? 1 : 0));
+  }
   const base = Math.floor(totalCents / count);
   const remainder = totalCents - base * count;
 
@@ -123,16 +128,48 @@ export function chooseMcqLayout(options, override = 'auto') {
   return maxLength > 32 || totalLength > 100 ? 'full' : 'half';
 }
 
-/** Consecutive type headings never change the authoritative position order. */
+/** One section per type; position remains authoritative within each type.
+ * New drafts are normalized to this same order before assigning positions.
+ * Viewing an older exam never rewrites its stored snapshot or positions.
+ */
 export function buildExamSections(rows) {
   const ordered = (rows || []).slice().sort((a, b) => Number(a.position) - Number(b.position));
-  const sections = [];
-  ordered.forEach((row, index) => {
-    const type = QUESTION_TYPES.includes(row?.snapshot?.type) ? row.snapshot.type : 'short';
-    if (sections.at(-1)?.type !== type) sections.push({ type, items: [] });
-    sections.at(-1).items.push({ row, displayNumber: index + 1 });
-  });
-  return sections;
+  let displayNumber = 0;
+  return QUESTION_TYPES.map((type) => ({ type,
+    items: ordered.filter((row) => (QUESTION_TYPES.includes(row?.snapshot?.type) ? row.snapshot.type : 'short') === type)
+      .map((row) => ({ row, displayNumber: ++displayNumber })),
+  })).filter((section) => section.items.length);
+}
+
+export function groupDraftItems(items) {
+  return QUESTION_TYPES.flatMap((type) => items.filter((item) => item.question.type === type));
+}
+
+export function selectDistribution(questions, requested, shuffle = (items) => items) {
+  const selected = [];
+  for (const type of QUESTION_TYPES) for (const difficulty of ['easy', 'medium', 'hard']) {
+    const count = requested[type]?.[difficulty] ?? 0;
+    if (!Number.isSafeInteger(count) || count < 0) throw new Error('أعداد الأسئلة يجب أن تكون أعداداً صحيحة غير سالبة.');
+    const pool = questions.filter((q) => q.type === type && q.difficulty === difficulty);
+    if (count > pool.length) {
+      const types = { true_false: 'صح / خطأ', mcq: 'اختيار من متعدد', short: 'إجابة قصيرة' };
+      const difficulties = { easy: 'سهل', medium: 'متوسط', hard: 'صعب' };
+      throw new Error(`${types[type]} — ${difficulties[difficulty]}: المطلوب ${count}، المتاح ${pool.length}. قلّل العدد أو أضف أسئلة.`);
+    }
+    selected.push(...shuffle(pool).slice(0, count));
+  }
+  if (!selected.length) throw new Error('حدّد سؤالاً واحداً على الأقل.');
+  return selected;
+}
+
+export function draftFromExam(exam, rows) {
+  return groupDraftItems([...rows].sort((a, b) => a.position - b.position).map((row) => ({
+    sourceRowId: row.id,
+    question: { ...structuredClone(row.snapshot), id: row.question_id || `historical-${row.id}`, subject_id: exam.subject_id },
+    options: row.snapshot.type === 'mcq' ? [...(row.snapshot.options || [])] : null,
+    points: row.snapshot.points,
+    layout: row.snapshot.layout || 'auto',
+  })));
 }
 
 export function questionAppliesToGroups(question, linkedGroups, selectedGroups) {

@@ -16,7 +16,7 @@ export async function runHardeningTests({ test, testAsync, read, utils, schema, 
     assert.equal(utils.questionAppliesToGroups({ group_scope: 'selected' }, [], ['a']), false);
     assert.equal(utils.questionAppliesToGroups({ group_scope: 'selected' }, ['a'], []), false);
   });
-  test('position يحكم العرض دون تغيير المصفوفة الأصلية أو تجميع الأنواع', () => {
+  test('position يحكم ترتيب النوع دون تغيير المصفوفة الأصلية', () => {
     const rows = [
       { id: 'third', position: 3, snapshot: { type: 'mcq', options: ['b', 'a'] } },
       { id: 'first', position: 1, snapshot: { type: 'mcq' } },
@@ -24,10 +24,10 @@ export async function runHardeningTests({ test, testAsync, read, utils, schema, 
     ];
     const before = structuredClone(rows);
     const sections = utils.buildExamSections(rows);
-    assert.deepEqual(sections.map((section) => section.type), ['mcq', 'true_false', 'mcq']);
-    assert.deepEqual(sections.flatMap((section) => section.items.map((item) => item.row.id)), ['first', 'second', 'third']);
+    assert.deepEqual(sections.map((section) => section.type), ['true_false', 'mcq']);
+    assert.deepEqual(sections.flatMap((section) => section.items.map((item) => item.row.id)), ['second', 'first', 'third']);
     assert.deepEqual(rows, before);
-    assert.deepEqual(sections.at(-1).items[0].row.snapshot.options, ['b', 'a']);
+    assert.deepEqual(sections.at(-1).items[1].row.snapshot.options, ['b', 'a']);
   });
   test('الدرجة التاريخية 1.234 تبقى ظاهرة دون تعديل الأصل', () => {
     const row = { snapshot: { points: '1.234' } };
@@ -97,7 +97,7 @@ export async function runHardeningTests({ test, testAsync, read, utils, schema, 
   });
   test('كل قوائم البيانات تستخدم تحميل الدفعات', () => {
     for (const name of ['subjects', 'groups', 'questions', 'exam-builder', 'exam-view', 'letterheads', 'dashboard', 'share-import']) {
-      assert.ok(read(`js/${name}.js`).includes('fetchAll('), name);
+      assert.ok(/fetchAll\(|createLibraryPage\(/.test(read(`js/${name}.js`)), name);
     }
     assert.ok(read('js/questions.js').includes('requestQuestionPage(supabase, filters'));
   });

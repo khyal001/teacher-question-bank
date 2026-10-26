@@ -1,3 +1,4 @@
+import { createLibraryPage } from './library-page.js';
 import { fetchAll } from './data-utils.js';
 import { createRequestGate } from './data-utils.js';
 // إدارة المواد وربطها بصفوف وفصول وأقسام دراسية متعددة، ومشاركة أسئلتها بأمان.
@@ -42,6 +43,8 @@ const shareError = document.getElementById('share-error');
 const sharesList = document.getElementById('shares-list');
 const sharesCount = document.getElementById('shares-count');
 
+const page = createLibraryPage('subjects', subjectsList, () => loadSubjects());
+let dialogVersion = 0;
 let currentUser = null;
 let subjects = [];
 let allGroups = [];
@@ -57,13 +60,15 @@ async function init() {
   currentUser = await requireAuth();
   if (!currentUser) return;
 
-  initNav('subjects', currentUser);
   bindEvents();
-  await loadSubjects();
+  const bootstrap = loadSubjects(true);
+  initNav('subjects', currentUser, { rolePromise: bootstrap.then((data) => data?.metadata?.role || 'teacher') });
+  await bootstrap;
 }
 
 function bindEvents() {
   document.getElementById('add-subject-btn').addEventListener('click', () => openDialog());
+  dialog.addEventListener('close', () => { dialogVersion++; });
   form.addEventListener('submit', handleSubmit);
   addGroupButton.addEventListener('click', handleInlineGroupAdd);
   newGroupInput.addEventListener('keydown', (event) => {
@@ -101,58 +106,27 @@ function bindEvents() {
 // ------------------------------------------------------------
 // تحميل البيانات
 // ------------------------------------------------------------
-async function loadSubjects() {
-  const [subjectsResult, groupsResult, linksResult, questionsResult] = await Promise.all([
-    fetchAll(supabase
-      .from('subjects')
-      .select('id, name, created_at')
-      .eq('user_id', currentUser.id)
-      .order('created_at', { ascending: false }), ['id']),
-    fetchAll(supabase
-      .from('teaching_groups')
-      .select('id, name')
-      .eq('user_id', currentUser.id)
-      .order('name', { ascending: true }), ['id']),
-    fetchAll(supabase
-      .from('subject_groups')
-      .select('subject_id, group_id')
-      .eq('user_id', currentUser.id), ['subject_id', 'group_id']),
-    fetchAll(supabase
-      .from('questions')
-      .select('subject_id')
-      .eq('user_id', currentUser.id), ['id']),
-  ]);
-
-  const firstError = [subjectsResult, groupsResult, linksResult, questionsResult]
-    .find((result) => result.error)?.error;
-
-  if (firstError) {
+async function loadSubjects(includeMetadata = false) {
+  try {
+    const data = await page.load(includeMetadata);
+    if (!data) return null;
+    subjects = data.items;
+    subjectGroups = new Map(subjects.map((subject) => [subject.id, subject.groups.map((g) => g.id)]));
+    questionCounts = new Map(subjects.map((subject) => [subject.id, subject.question_count]));
+    renderSubjects();
+    page.rendered();
+    return data;
+  } catch (error) {
     subjectsCount.textContent = '—';
-    renderInlineError(subjectsList, friendlyError(firstError));
-    return;
+    renderInlineError(subjectsList, friendlyError(error));
+    return null;
   }
-
-  subjects = subjectsResult.data || [];
-  allGroups = groupsResult.data || [];
-
-  subjectGroups = new Map();
-  for (const link of linksResult.data || []) {
-    if (!subjectGroups.has(link.subject_id)) subjectGroups.set(link.subject_id, []);
-    subjectGroups.get(link.subject_id).push(link.group_id);
-  }
-
-  questionCounts = new Map();
-  for (const row of questionsResult.data || []) {
-    questionCounts.set(row.subject_id, (questionCounts.get(row.subject_id) || 0) + 1);
-  }
-
-  renderSubjects();
 }
 
 async function loadAllGroups() {
   const { data, error } = await fetchAll(supabase
     .from('teaching_groups')
-    .select('id, name')
+    .select('id, name', { count: 'exact' })
     .eq('user_id', currentUser.id)
     .order('name', { ascending: true }), ['id']);
 
@@ -160,21 +134,15 @@ async function loadAllGroups() {
   allGroups = data || [];
 }
 
-function groupNameById(id) {
-  return allGroups.find((group) => group.id === id)?.name || '';
-}
-
 function groupsOfSubject(subjectId) {
-  return (subjectGroups.get(subjectId) || [])
-    .map((groupId) => allGroups.find((group) => group.id === groupId))
-    .filter(Boolean);
+  return subjects.find((subject) => subject.id === subjectId)?.groups || [];
 }
 
 // ------------------------------------------------------------
 // العرض
 // ------------------------------------------------------------
 function renderSubjects() {
-  subjectsCount.textContent = `${subjects.length} مادة`;
+  subjectsCount.textContent = `${page.total} مادة`;
   subjectsList.replaceChildren();
 
   if (subjects.length === 0) {
@@ -255,7 +223,8 @@ function renderSubjectCard(subject) {
 // ------------------------------------------------------------
 // نموذج المادة والصفوف والفصول والأقسام
 // ------------------------------------------------------------
-function openDialog(subject = null) {
+async function openDialog(subject = null) {
+  const version = ++dialogVersion;
   const isEdit = Boolean(subject);
 
   idInput.value = subject?.id || '';
@@ -265,13 +234,22 @@ function openDialog(subject = null) {
   showFormError(groupInlineError, '');
 
   const selected = new Set(subject ? subjectGroups.get(subject.id) || [] : []);
-  renderGroupCheckboxes(selected);
+  groupsList.replaceChildren(h('p', { text: 'جارٍ تحميل الصفوف والفصول والأقسام...' }));
 
   dialogTitle.textContent = isEdit ? 'تعديل المادة' : 'إضافة مادة';
   saveButton.textContent = isEdit ? 'حفظ التعديلات' : 'حفظ المادة';
 
   dialog.showModal();
   nameInput.focus();
+  saveButton.disabled = true;
+  try {
+    await loadAllGroups();
+    if (version === dialogVersion && dialog.open) renderGroupCheckboxes(selected);
+  } catch (error) {
+    if (version === dialogVersion) showFormError(errorBox, friendlyError(error));
+  } finally {
+    if (version === dialogVersion) saveButton.disabled = false;
+  }
 }
 
 function renderGroupCheckboxes(selectedIds = new Set()) {

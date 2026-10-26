@@ -77,7 +77,7 @@ export async function runAdminTests({ test, testAsync, read, fullSchema, migrati
   });
   test('الاختيار التلقائي لا يبدل نطاق all التاريخي إلى selected', () => {
     const questions = read('js/questions.js');
-    assert.ok(questions.includes("const desiredScope = question?.group_scope || 'all'"));
+    assert.ok(questions.includes("const desiredScope = question?.group_scope || 'selected'"));
     assert.ok(questions.includes('checkbox.checked = selectedIds.has(group.id) || groups.length === 1'));
     assert.ok(questions.includes('أي صف / فصل / قسم يضاف للمادة مستقبلًا'));
     assert.ok(read('js/subjects.js').includes('selectedIds.has(group.id) || allGroups.length === 1'));

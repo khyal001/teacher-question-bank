@@ -4333,3 +4333,41 @@ body.show-answer-key .answer-key {
   body.print-answers .exam-ending { display: none !important; }
   .positioned-letterhead { display: grid; }
 }
+
+/* Library lists render independently of optional logo downloads. */
+.library-pagination {
+  display: flex;
+  gap: .6rem;
+  align-items: center;
+  justify-content: center;
+  margin-block: 1rem;
+  flex-wrap: wrap;
+}
+.distribution-scroll { overflow-x: auto; }
+.distribution-table { width: 100%; border-collapse: collapse; }
+.distribution-table caption { text-align: start; font-size: .85rem; padding-block: .5rem; }
+.distribution-table th, .distribution-table td { padding: .35rem; text-align: start; }
+.distribution-table input { width: 100%; min-width: 3.4rem; }
+.distribution-table small { display: block; font-size: .72rem; color: var(--muted); }
+.exam-section-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  break-after: avoid;
+  page-break-after: avoid;
+}
+.exam-grade-left {
+  flex-shrink: 0;
+  margin-inline-start: auto;
+  font-size: .82rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.exam-short-grade { display: flex; margin-block-end: .2rem; }
+.exam-section-title .exam-section-heading { flex: 1; }
+@media print {
+  .library-pagination { display: none !important; }
+  .exam-grade-left { color: #000; font-size: 10pt; }
+  .exam-short-item, .exam-tf-item, .exam-mcq-item { break-inside: avoid; page-break-inside: avoid; }
+}

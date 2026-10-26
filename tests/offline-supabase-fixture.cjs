@@ -13,7 +13,7 @@ function installMock() {
     subjects: [{ id: 'subject-1', name: 'الرياضيات' }, { id: 'subject-2', name: 'الفيزياء' }], teaching_groups: [{ id: 'group-1', name: 'الأول الثانوي' }, { id: 'group-2', name: 'الثاني الثانوي' }],
     subject_groups: [{ subject_id: 'subject-1', group_id: 'group-1' }, { subject_id: 'subject-2', group_id: 'group-2' }], questions, letterheads: [letterhead],
     exams: [{ id: 'exam-1', title: 'اختبار تجريبي', subject_name_snapshot: 'الرياضيات', grade_level_snapshot: 'صف قديم',
-      total_points: 3, group_names_snapshot: ['الأول الثانوي'], letterhead_snapshot: letterhead, closing_phrase: 'انتهت الأسئلة', created_at: '2026-10-26T00:00:00Z' }],
+      subject_id: 'subject-1', sealed: true, group_ids_snapshot: ['group-1'], total_points: 3, group_names_snapshot: ['الأول الثانوي'], letterhead_snapshot: letterhead, closing_phrase: 'انتهت الأسئلة', created_at: '2026-10-26T00:00:00Z' }],
     exam_questions: questions.slice(0, 3).map((q, i) => ({ id: `eq-${i}`, question_id: q.id, position: i + 1, snapshot: { ...q, points: 1, layout: 'auto' } })),
   };
   window.__calls = [];
@@ -27,7 +27,9 @@ function installMock() {
       signOut: async () => ({ error: null }),
     },
     rpc: async (name, params) => {
-      window.__calls.push({ rpc: name, params, at: performance.now() });
+      const call = { rpc: name, params, at: performance.now() };
+      window.__calls.push(call);
+      try {
       const delay = window.__searchDelays?.[params?.p_search] ?? window.__delayMs ?? 0;
       if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
       if (name === 'get_questions_page') {
@@ -42,9 +44,39 @@ function installMock() {
           total: rows.length, subject_id: subject, metadata: params.p_include_metadata ? { subjects: tables.subjects,
             units: [...new Set(tables.questions.map((q) => q.unit).filter(Boolean))], role: window.__role } : null } };
       }
+      if (['get_subjects_page', 'get_exams_page', 'get_letterheads_page'].includes(name)) {
+        const table = name.slice(4, -5);
+        const all = tables[table];
+        const items = all.slice(params.p_offset, params.p_offset + params.p_limit).map((row) => table === 'subjects' ? { ...row,
+          groups: tables.subject_groups.filter((link) => link.subject_id === row.id).map((link) => tables.teaching_groups.find((g) => g.id === link.group_id)),
+          question_count: tables.questions.filter((q) => q.subject_id === row.id).length,
+        } : row);
+        return { data: { items, total: all.length, metadata: params.p_include_metadata ? { role: window.__role } : null }, error: null };
+      }
+      if (name === 'get_exam_source') {
+        return { data: { exam: tables.exams.find((row) => row.id === params.p_exam_id), questions: tables.exam_questions }, error: null };
+      }
+      if (name === 'save_exam' || name === 'save_exam_revision') {
+        window.__savedPayload = structuredClone(params);
+        return { data: null, error: { message: 'توقف مقصود للاختبار المحلي قبل الانتقال؛ لم يتم الحفظ على أي خادم.' } };
+      }
       return { data: name === 'get_my_role' ? window.__role : name === 'get_question_units' ? ['باب الجبر', 'Chapter 2'] : null, error: null };
+      } finally { call.finishedAt = performance.now(); }
     },
-    storage: { from: () => ({ createSignedUrl: async () => ({ data: { signedUrl: '/favicon.svg' } }) }) },
+    storage: { from: () => ({
+      createSignedUrl: async (path) => {
+        const call = { storage: 'sign', paths: [path], at: performance.now() }; window.__calls.push(call);
+        await new Promise((resolve) => setTimeout(resolve, window.__logoDelayMs ?? window.__delayMs ?? 0));
+        call.finishedAt = performance.now();
+        return { data: { signedUrl: '/favicon.svg' }, error: null };
+      },
+      createSignedUrls: async (paths) => {
+        const call = { storage: 'signMany', paths, at: performance.now() }; window.__calls.push(call);
+        await new Promise((resolve) => setTimeout(resolve, window.__logoDelayMs ?? window.__delayMs ?? 0));
+        call.finishedAt = performance.now();
+        return { data: paths.map((path) => ({ path, signedUrl: '/favicon.svg' })), error: null };
+      },
+    }) },
     from(table) {
       let predicates = [];
       let counted = false;
