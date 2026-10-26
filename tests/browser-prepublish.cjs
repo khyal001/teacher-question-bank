@@ -159,7 +159,7 @@ const { installMock } = require('./offline-supabase-fixture.cjs');
     checks++;
     await page.addInitScript(() => { window.__role = 'admin'; });
     await page.goto('http://teacher-bank.test/profile.html');
-    await page.waitForSelector('[data-admin-navigation]');
+    await page.waitForSelector('[data-admin-navigation]', { state: 'attached' });
     assert.equal(await page.locator('[data-admin-navigation]').getAttribute('href'), './admin.html');
     checks++;
     assert.deepEqual(errors, []);

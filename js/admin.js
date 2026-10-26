@@ -1,5 +1,5 @@
 import { supabase } from './supabase.js';
-import { initNav, requireAuth } from './auth.js';
+import { applyNavigationRole, initNav, requireAuth } from './auth.js';
 import { createRequestGate } from './data-utils.js';
 import { loadAdminData } from './admin-utils.js';
 import { formatDate, friendlyError, h, renderEmptyState } from './ui.js';
@@ -49,6 +49,7 @@ async function loadPage() {
   try {
     const result = await loadAdminData(supabase, { search: search.value.trim(), sort: sort.value, offset, limit: pageSize });
     if (!gate.isCurrent(request)) return;
+    applyNavigationRole('admin');
     // Each refresh authorizes again; never leave old personal data visible on denial.
     stats.replaceChildren(...result.entries.map((entry) => h('article', { class: 'stat-card admin-stat-card' },
       h('span', { class: 'muted', text: entry.label }), h('strong', { text: String(entry.value) }))));
@@ -62,6 +63,7 @@ async function loadPage() {
     status.hidden = true;
   } catch (error) {
     if (!gate.isCurrent(request)) return;
+    applyNavigationRole('teacher');
     content.hidden = true;
     stats.replaceChildren();
     teachers.replaceChildren();

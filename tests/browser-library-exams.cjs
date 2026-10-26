@@ -31,7 +31,7 @@ fs.mkdirSync(artifacts, { recursive: true });
   try {
     let page = await open('subjects.html', `__tables.subjects = Array.from({length:53}, (_,i) => ({...__tables.subjects[0], id:i?'subject-'+(i+1):'subject-1', name:'مادة '+(i+1)})); __role='admin';`);
     await page.waitForFunction(() => document.querySelectorAll('.subject-card').length === 25);
-    await page.waitForSelector('[data-admin-navigation]');
+    await page.waitForSelector('[data-admin-navigation]', { state: 'attached' });
     assert.deepEqual(await page.evaluate(() => __calls.map((c) => c.rpc || c.table)), ['get_subjects_page']);
     checks++;
     await page.locator('.library-pagination button').last().click();

@@ -1,6 +1,7 @@
 import { performSignOut } from './data-utils.js';
 import { navigationRole, profileName } from './profile-utils.js';
 import { friendlyError, toast } from './ui.js';
+import { initNavigation, placeAdminNavigation } from './navigation.js';
 // المصادقة وحماية الصفحات وقائمة التنقل المشتركة.
 import { supabase, isSupabaseConfigured } from './supabase.js';
 
@@ -200,32 +201,7 @@ export function initNav(activePage, user, { rolePromise = null } = {}) {
     });
   }
 
-  const toggle = document.getElementById('nav-toggle');
-  const nav = document.getElementById('main-nav');
-
-  if (toggle && nav && !toggle.dataset.bound) {
-    toggle.dataset.bound = 'true';
-
-    toggle.addEventListener('click', () => {
-      const isOpen = nav.classList.toggle('open');
-      toggle.setAttribute('aria-expanded', String(isOpen));
-    });
-
-    nav.querySelectorAll('a').forEach((link) => {
-      link.addEventListener('click', () => {
-        nav.classList.remove('open');
-        toggle.setAttribute('aria-expanded', 'false');
-      });
-    });
-
-    document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape' && nav.classList.contains('open')) {
-        nav.classList.remove('open');
-        toggle.setAttribute('aria-expanded', 'false');
-        toggle.focus();
-      }
-    });
-  }
+  initNavigation(activePage, user);
 }
 
 // Presentation only. Roles supplied here come from an authenticated server RPC;
@@ -240,4 +216,5 @@ export function applyNavigationRole(role) {
   link.dataset.adminNavigation = 'true';
   link.textContent = 'إدارة النظام';
   document.getElementById('nav-user-name')?.closest('.nav-user')?.appendChild(link);
+  placeAdminNavigation(link);
 }
