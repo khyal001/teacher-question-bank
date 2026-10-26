@@ -1,14 +1,13 @@
 // ============================================================
 // إعدادات Supabase
-// استبدل القيمتين بقيم مشروعك من:
-// Supabase Dashboard > Project Settings > API
+// القيم من: Supabase Dashboard > Project Settings > API
 //
-// ملاحظة: anon key مفتاح عام مخصص للواجهة، وليس secret.
-// لا تضع service_role key هنا إطلاقاً.
+// ملاحظة: Publishable key مفتاح عام مخصص للواجهة، وليس secret.
+// لا تضع service_role أو Secret key هنا إطلاقاً.
 // ============================================================
 
-export const SUPABASE_URL = 'https://YOUR-PROJECT-REF.supabase.co';
-export const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_PUBLIC_KEY';
+export const SUPABASE_URL = 'https://gjkuyecnyhlbvaftuwel.supabase.co';
+export const SUPABASE_ANON_KEY = 'sb_publishable_qrz46ilM_OFhYynW-aBiEg_lvGDExEZ';
 
 const PLACEHOLDER_URL = 'https://YOUR-PROJECT-REF.supabase.co';
 const PLACEHOLDER_KEY = 'YOUR_SUPABASE_ANON_PUBLIC_KEY';

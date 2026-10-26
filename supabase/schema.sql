@@ -179,10 +179,10 @@ create trigger questions_validate_before_write
 
 -- ============================================================
 -- حماية البيانات التاريخية بعد الحفظ:
--- 1) snapshot اسم المادة والصف داخل exams لا يتغير بعد الإنشاء،
---    وsubject_id يثبت بعد الإنشاء.
---    الاستثناء الوحيد: تحويل UUID إلى NULL عند حذف المادة الأصلية
---    فعلياً عبر ON DELETE SET NULL؛ لا يُسمح بإعادة الربط لاحقاً.
+-- 1) snapshot اسم المادة والصف داخل exams لا يتغير بعد الإنشاء.
+--    subject_id يمكن أن يتحول من UUID إلى NULL، لكن لا يمكن تغييره
+--    إلى UUID آخر ولا إعادة ربطه بعد أن يصبح NULL.
+--    هذا يسمح لـ ON DELETE SET NULL بالعمل دون فحص جدول subjects.
 -- 2) snapshot السؤال وترتيبه وارتباطه داخل exam_questions
 --    لا تتغير بعد الحفظ.
 --    يسمح فقط بتحويل question_id من UUID إلى NULL عند حذف
@@ -200,21 +200,11 @@ begin
       using errcode = '42501';
   end if;
 
-  -- subject_id ثابت بعد الإنشاء.
-  -- الاستثناء الوحيد: UUID -> NULL الناتج عن ON DELETE SET NULL
-  -- بعد حذف المادة الأصلية فعلياً. أي UUID آخر أو إعادة ربط مرفوضة.
+  -- يسمح بفقد الارتباط فقط: UUID -> NULL.
+  -- أي انتقال إلى UUID آخر، أو إعادة ربط بعد NULL، مرفوض.
   if new.subject_id is distinct from old.subject_id then
     if new.subject_id is not null then
-      raise exception 'لا يمكن تغيير subject_id بعد إنشاء الاختبار'
-        using errcode = '42501';
-    end if;
-
-    if exists (
-      select 1
-      from public.subjects s
-      where s.id = old.subject_id
-    ) then
-      raise exception 'لا يمكن تحويل subject_id إلى NULL يدوياً؛ يُسمح بذلك فقط عند حذف المادة الأصلية'
+      raise exception 'لا يمكن تغيير subject_id إلى مادة أخرى أو إعادة ربطه بعد أن يصبح NULL'
         using errcode = '42501';
     end if;
   end if;

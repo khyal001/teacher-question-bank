@@ -86,22 +86,22 @@
 1. افتح **Project Settings > API**.
 2. انسخ:
    - **Project URL**
-   - **anon public key**
+   - **Publishable key** (أو **anon public key** القديم إن كان مشروعك ما زال يستخدمه)
 3. افتح `js/config.js` واستبدل القيمتين:
 
 ```js
 export const SUPABASE_URL = 'https://YOUR-PROJECT-REF.supabase.co';
-export const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_PUBLIC_KEY';
+export const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_PUBLISHABLE_KEY';
 ```
 
 بعد الاستبدال يجب أن يبقى الملف هكذا:
 
 ```js
 export const SUPABASE_URL = 'https://abcdefghijklmnop.supabase.co';
-export const SUPABASE_ANON_KEY = 'eyJhbGciOi...';
+export const SUPABASE_ANON_KEY = 'sb_publishable_...';
 ```
 
-> `SUPABASE_ANON_KEY` مفتاح عام مخصص لتطبيقات الواجهة، وليس سراً. لا تضع أبداً `service_role key` داخل المشروع.
+> اسم المتغير `SUPABASE_ANON_KEY` باقٍ للتوافق مع الكود الحالي، ويمكن أن يحمل **Publishable key** أو **anon public key** القديم. كلاهما مفتاح عام مخصص لتطبيقات الواجهة وليس سراً. لا تضع أبداً `service_role` أو **Secret key** داخل المشروع.
 
 ---
 
@@ -375,7 +375,7 @@ where exam_id = 'UUID_EXAM';
 ### حماية إضافية للسجلات المحفوظة
 
 - لا يمكن إدراج اختبار جديد بدون `subject_id` يملكه المعلم، ولا بد أن يطابق اسم المادة والصف قيمة snapshot وقت الإنشاء.
-- لا يمكن تحويل `subject_id` إلى `NULL` يدوياً؛ يصبح `NULL` فقط عند حذف المادة الأصلية عبر `ON DELETE SET NULL`.
+- يمكن أن يفقد `subject_id` ارتباطه (`UUID → NULL`)، لكن لا يمكن تغييره إلى مادة أخرى أو إعادة ربطه بعد أن يصبح `NULL`.
 - لا يمكن تغيير `subject_name_snapshot` أو `grade_level_snapshot` بعد إنشاء الاختبار.
 - لا يمكن تغيير `snapshot` أو `position` أو `exam_id` في `exam_questions` بعد الحفظ.
 - لا يمكن استبدال `question_id` بسؤال أصلي آخر؛ يُسمح فقط بتحويله إلى `NULL` عند حذف السؤال الأصلي.
@@ -386,7 +386,7 @@ where exam_id = 'UUID_EXAM';
 
 ## 8) ملاحظة أمنية مهمة
 
-- `SUPABASE_ANON_KEY` **ليس مفتاحاً سرياً**. هو مفتاح عام مصمم ليكون ظاهراً في تطبيقات الواجهة، والحماية الحقيقية تأتي من:
+- `SUPABASE_ANON_KEY` (سواء حمل **Publishable key** أو **anon public key** القديم) **ليس مفتاحاً سرياً**. هو مفتاح عام مصمم ليكون ظاهراً في تطبيقات الواجهة، والحماية الحقيقية تأتي من:
   - Supabase Auth.
   - Row Level Security.
   - سياسات قاعدة البيانات والتحقق من العلاقات.
@@ -401,7 +401,7 @@ where exam_id = 'UUID_EXAM';
 
 | المشكلة | السبب المحتمل | الحل |
 |---|---|---|
-| تظهر رسالة «لم يتم إعداد Supabase» | قيم `js/config.js` ما زالت placeholders | ضع Project URL وanon key |
+| تظهر رسالة «لم يتم إعداد Supabase» | قيم `js/config.js` ما زالت placeholders | ضع Project URL وPublishable key (أو anon key) |
 | تسجيل الدخول يعمل لكن البيانات لا تظهر | لم يُشغَّل `schema.sql` أو فشل جزء منه | أعد تشغيل الملف كاملاً من SQL Editor |
 | خطأ RLS عند حفظ اختبار | snapshots المادة لا تطابق المادة الحالية | أعد تحميل الصفحة ثم أعد التوليد |
 | رابط تأكيد البريد يعيد خطأ | الرابط غير موجود في Redirect URLs | أضف رابط GitHub Pages وlocalhost |
