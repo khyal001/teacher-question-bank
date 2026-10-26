@@ -111,6 +111,23 @@ const { installMock } = require('./offline-supabase-fixture.cjs');
 
     await page.goto('http://teacher-bank.test/exam-view.html?id=exam-1');
     await page.waitForSelector('.exam-closing');
+    await page.keyboard.press('Tab');
+    assert.equal(await page.locator('.skip-link').evaluate((node) => node === document.activeElement), true);
+    assert.equal(await page.evaluate(() => {
+      const link = document.querySelector('.skip-link').getBoundingClientRect();
+      const header = document.querySelector('.site-header').getBoundingClientRect();
+      return link.top >= 0 && link.bottom <= header.top && link.right <= innerWidth;
+    }), true);
+    checks++;
+    await page.emulateMedia({ media: 'print' });
+    assert.equal(await page.locator('.skip-link').evaluate((node) => getComputedStyle(node).display), 'none');
+    checks++;
+    await page.emulateMedia({ media: 'screen' });
+    await page.locator('.skip-link').focus();
+    await page.keyboard.press('Enter');
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'main-content');
+    assert.equal(await page.locator('.skip-link').evaluate((node) => node.getBoundingClientRect().bottom <= 0), true);
+    checks++;
     const ending = await page.evaluate(() => {
       const questions = document.querySelector('.exam-questions').getBoundingClientRect();
       const closing = document.querySelector('.exam-closing').getBoundingClientRect();

@@ -150,7 +150,14 @@ code {
 }
 
 .skip-link:focus {
-  top: 16px;
+  position: relative;
+  display: block;
+  inset-inline-start: auto;
+  top: auto;
+  border-radius: 0;
+  text-align: center;
+  outline-offset: -3px;
+  transition: none;
 }
 
 /* ------------------------------------------------------------
@@ -2624,6 +2631,10 @@ fieldset legend {
    الطباعة على A4
    ------------------------------------------------------------ */
 @media print {
+  .skip-link {
+    display: none !important;
+  }
+
   @page {
     size: A4;
     margin: 14mm;
