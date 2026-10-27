@@ -13,7 +13,6 @@ const signupForm = document.getElementById('signup-form');
 const loginError = document.getElementById('login-error');
 const signupError = document.getElementById('signup-error');
 const feedback = document.getElementById('auth-feedback');
-const setupNotice = document.getElementById('setup-notice');
 
 init();
 
@@ -27,7 +26,18 @@ async function init() {
   if (!isSupabaseConfigured) {
     document.getElementById('auth-title').textContent = 'الدخول والتسجيل غير متاحين حاليًا';
     document.getElementById('auth-intro').textContent = 'تواصل مع مسؤول الموقع للمساعدة، أو حاول لاحقًا.';
-    setupNotice.hidden = false;
+    const setupNotice = document.createElement('div');
+    setupNotice.id = 'setup-notice';
+    setupNotice.className = 'notice notice-warning';
+    const label = document.createElement('strong');
+    label.textContent = 'تنبيه: ';
+    const message = document.createElement('span');
+    message.textContent = 'تسجيل الدخول وإنشاء الحساب غير متاحين حاليًا؛ لا يمكن بدء استخدام الموقع بحساب جديد حتى استعادة الخدمة. ';
+    const contact = document.createElement('a');
+    contact.href = './about.html#contact-title';
+    contact.textContent = 'تواصل مع مسؤول الموقع عبر البريد أو تلغرام.';
+    setupNotice.append(label, message, contact);
+    feedback.before(setupNotice);
     disableAuthForms();
     return;
   }

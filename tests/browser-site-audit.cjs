@@ -29,10 +29,14 @@ const root = path.resolve(__dirname, '..');
       });
       const page = await context.newPage();
       page.on('pageerror', (error) => errors.push(error.message));
+      const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+      assert.equal(html.includes('setup-notice'), false);
+      assert.equal(html.includes('غير متاحين حاليًا'), false);
+      checks += 2;
       await page.goto('http://teacher-bank.test/index.html');
       if (configured) {
         await page.waitForFunction(() => document.querySelector('#tab-signup').getAttribute('aria-selected') === 'false');
-        assert.equal(await page.locator('#setup-notice').isVisible(), false);
+        assert.equal(await page.locator('#setup-notice').count(), 0);
         assert.equal(await page.locator('#login-submit').isEnabled(), true);
         await page.locator('#login-email').fill('teacher@example.com');
         await page.locator('#login-password').fill('test-password');
@@ -49,6 +53,9 @@ const root = path.resolve(__dirname, '..');
         checks += 4;
       } else {
         await page.locator('#setup-notice').waitFor({ state: 'visible' });
+        assert.equal(await page.locator('#setup-notice').count(), 1);
+        assert.match(await page.locator('#setup-notice').innerText(), /تسجيل الدخول وإنشاء الحساب غير متاحين/);
+        assert.equal(await page.locator('#auth-intro').innerText(), 'تواصل مع مسؤول الموقع للمساعدة، أو حاول لاحقًا.');
         assert.match(await page.locator('#auth-title').innerText(), /غير متاحين/);
         assert.equal(await page.locator('#login-submit').isDisabled(), true);
         await page.locator('#tab-signup').click();
@@ -57,7 +64,7 @@ const root = path.resolve(__dirname, '..');
         await page.locator('#setup-notice a').click();
         await page.locator('#contact-title').waitFor();
         assert.match(await page.locator('#contact-email').getAttribute('href'), /^mailto:/);
-        checks += 5;
+        checks += 8;
       }
       for (const [file, canonical] of [['index.html', 'https://khyal001.github.io/teacher-question-bank/'], ['about.html', 'https://khyal001.github.io/teacher-question-bank/about.html']]) {
         await page.goto('http://teacher-bank.test/' + file);
