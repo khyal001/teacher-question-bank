@@ -8,6 +8,43 @@ export async function runAdminTests({ test, testAsync, read, fullSchema, migrati
   const fn = (name) => sql.match(new RegExp(`create or replace function (?:public|teacher_bank_private)\\.${name}\\([\\s\\S]*?\\$\\$;`))?.[0] || '';
   const stats = { teacher_count: 2, subject_count: 7, group_count: 3, question_count: 19, exam_count: 5, letterhead_count: 4 };
 
+  const separated = read('supabase/migrations/20261031_separate_user_roles.sql');
+  const currentFn = (name) => separated.match(new RegExp(`create or replace function (?:public|teacher_bank_private)\\.${name}\\([\\s\\S]*?\\$\\$;`))?.[0] || '';
+  test('فصل الأدوار يحفظ القيم ويمنع الكتابة المباشرة ولا يحذف بيانات الحساب', () => {
+    assert.ok(separated.includes('lock table teacher_bank_private.profiles in access exclusive mode'));
+    assert.ok(separated.includes('select id, role from teacher_bank_private.profiles'));
+    assert.ok(separated.includes('user_id uuid primary key references auth.users(id) on delete cascade'));
+    assert.ok(separated.includes('alter table teacher_bank_private.user_roles enable row level security'));
+    assert.ok(separated.includes('revoke all on teacher_bank_private.user_roles from public, anon, authenticated'));
+    assert.ok(!/create policy|grant\s+(select|insert|update|delete)|drop[^;]*cascade|delete from/i.test(separated));
+    assert.ok(separated.indexOf('select id, role') < separated.indexOf('drop column role'));
+    assert.ok(!separated.includes('if not exists')); // Unexpected existing table aborts, never merges silently.
+  });
+  test('دالة الدور خاصة وآمنة وتفحص هوية المستدعي فقط', () => {
+    const check = currentFn('has_role');
+    assert.ok(check.includes('has_role(p_role text)'));
+    assert.ok(check.includes("stable security definer set search_path = ''"));
+    assert.ok(check.includes('r.user_id = auth.uid() and r.role = p_role'));
+    assert.ok(check.includes('auth.uid() is not null'));
+    assert.ok(!/metadata|execute|p_user_id/.test(check));
+    assert.ok(separated.includes('revoke all on function teacher_bank_private.has_role(text) from public, anon, authenticated'));
+    assert.ok(!/grant execute on function teacher_bank_private/.test(separated));
+    assert.ok(currentFn('require_admin').includes("if not teacher_bank_private.has_role('admin') then"));
+  });
+  test('الدوال النهائية تستخدم جدول الأدوار والتسجيل لا يقبل دورًا من المستخدم', () => {
+    for (const name of ['get_my_role', 'get_admin_stats', 'get_admin_teachers']) {
+      assert.ok(currentFn(name).includes('teacher_bank_private.user_roles'), name);
+      assert.ok(!currentFn(name).includes('p.role'), name);
+    }
+    const create = currentFn('create_user_profile');
+    assert.ok(create.includes("values (new.id, 'teacher') on conflict (user_id) do nothing"));
+    assert.ok(!/->>\s*'role'|'admin'|raw_app_meta_data/.test(create));
+    for (const name of ['get_admin_stats', 'get_admin_teachers']) {
+      assert.ok(currentFn(name).includes('perform teacher_bank_private.require_admin()'));
+    }
+    assert.ok(fullSchema.includes(separated.slice(separated.indexOf('-- BEGIN SEPARATE'), separated.indexOf('-- END SEPARATE'))));
+  });
+
   test('Teacher لا يعتبر Admin، والـmetadata والكائنات لا تمنح دورًا', () => {
     assert.equal(admin.isAdminRole('teacher'), false);
     assert.equal(admin.isAdminRole(null), false);
@@ -171,8 +208,8 @@ export async function runAdminTests({ test, testAsync, read, fullSchema, migrati
     const example = read('supabase/assign_first_admin.example.sql');
     assert.ok(example.includes('MANUAL EXAMPLE ONLY'));
     assert.ok(example.includes("v_user_id uuid := '00000000-0000-0000-0000-000000000000'"));
-    assert.ok(example.includes("set role = 'admin', updated_at = now()"));
-    assert.ok(example.includes('where id = v_user_id'));
+    assert.ok(example.includes("set role = 'admin'"));
+    assert.ok(example.includes('where user_id = v_user_id'));
     assert.ok(!example.includes('@'));
     assert.ok(!fullSchema.includes("set role = 'admin'"));
   });

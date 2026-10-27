@@ -25,6 +25,8 @@ async function init() {
   if (nextParam) rememberAuthNext(nextParam);
 
   if (!isSupabaseConfigured) {
+    document.getElementById('auth-title').textContent = 'الدخول والتسجيل غير متاحين حاليًا';
+    document.getElementById('auth-intro').textContent = 'تواصل مع مسؤول الموقع للمساعدة، أو حاول لاحقًا.';
     setupNotice.hidden = false;
     disableAuthForms();
     return;
