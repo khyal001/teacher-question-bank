@@ -130,7 +130,11 @@ export function initNavigation(activePage, user) {
   panelHead.append(title, close);
   const scroll = element('div', 'navigation-scroll');
   scroll.append(nav);
-  panel.append(panelHead, scroll);
+  const panelFooter = element('div', 'navigation-panel-footer');
+  const about = element('a', '', 'من نحن');
+  about.href = './about.html';
+  panelFooter.append(about);
+  panel.append(panelHead, scroll, panelFooter);
   const backdrop = element('div', 'navigation-backdrop no-print');
   backdrop.hidden = true;
   document.body.append(backdrop, panel);
@@ -177,7 +181,7 @@ export function initNavigation(activePage, user) {
   });
   close.addEventListener('click', () => dismiss());
   backdrop.addEventListener('click', () => dismiss());
-  nav.addEventListener('click', (event) => {
+  panel.addEventListener('click', (event) => {
     if (mobile.matches && event.target.closest('a')) dismiss(false);
   });
   document.addEventListener('keydown', (event) => {

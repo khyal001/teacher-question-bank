@@ -98,7 +98,7 @@ fs.mkdirSync(artifacts, { recursive: true });
         assert.equal(await page.locator('#main-content').evaluate((node) => node.inert), true);
         await page.locator('.navigation-close').focus();
         await page.keyboard.press('Shift+Tab');
-        assert.equal(await page.locator('#main-nav a').last().evaluate((node) => node === document.activeElement), true);
+        assert.equal(await page.locator('.navigation-panel-footer a').evaluate((node) => node === document.activeElement), true);
         await page.keyboard.press('Tab');
         assert.equal(await page.locator('.navigation-close').evaluate((node) => node === document.activeElement), true);
         await page.keyboard.press('Escape');
