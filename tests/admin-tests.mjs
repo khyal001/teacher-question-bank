@@ -18,7 +18,9 @@ export async function runAdminTests({ test, testAsync, read, fullSchema, migrati
     assert.ok(separated.includes('revoke all on teacher_bank_private.user_roles from public, anon, authenticated'));
     assert.ok(!/create policy|grant\s+(select|insert|update|delete)|drop[^;]*cascade|delete from/i.test(separated));
     assert.ok(separated.indexOf('select id, role') < separated.indexOf('drop column role'));
-    assert.ok(!separated.includes('if not exists')); // Unexpected existing table aborts, never merges silently.
+    assert.ok(separated.includes('Mixed legacy and separate role objects require manual review'));
+    assert.ok(separated.includes('Known separate role table required'));
+    assert.ok(!separated.includes('create table if not exists teacher_bank_private.user_roles'));
   });
   test('دالة الدور خاصة وآمنة وتفحص هوية المستدعي فقط', () => {
     const check = currentFn('has_role');
@@ -42,7 +44,11 @@ export async function runAdminTests({ test, testAsync, read, fullSchema, migrati
     for (const name of ['get_admin_stats', 'get_admin_teachers']) {
       assert.ok(currentFn(name).includes('perform teacher_bank_private.require_admin()'));
     }
-    assert.ok(fullSchema.includes(separated.slice(separated.indexOf('-- BEGIN SEPARATE'), separated.indexOf('-- END SEPARATE'))));
+    for (const name of ['has_role', 'create_user_profile', 'require_admin', 'get_my_role', 'get_admin_stats', 'get_admin_teachers']) {
+      assert.equal(fn(name), currentFn(name), name);
+      assert.ok(fullSchema.includes(fn(name)), name);
+    }
+    assert.ok(!fullSchema.includes('-- BEGIN SEPARATE USER ROLES V1'));
   });
 
   test('Teacher لا يعتبر Admin، والـmetadata والكائنات لا تمنح دورًا', () => {
@@ -146,7 +152,12 @@ export async function runAdminTests({ test, testAsync, read, fullSchema, migrati
   // Static SQL authorization contracts; these are not live RLS tests.
   test('Profiles خاص وRLS بلا سياسات عميل ولا صلاحية تغيير الدور', () => {
     assert.ok(sql.includes('create table if not exists teacher_bank_private.profiles'));
-    assert.ok(sql.includes("role text not null default 'teacher' check (role in ('teacher', 'admin'))"));
+    for (const source of [sql, fullSchema]) {
+      const profiles = source.match(/create table if not exists teacher_bank_private\.profiles\s*\([\s\S]*?\n\);/)?.[0];
+      assert.ok(profiles);
+      assert.ok(!/\brole\b|\bis_admin\b/.test(profiles));
+      assert.ok(source.includes('create table teacher_bank_private.user_roles'));
+    }
     assert.ok(sql.includes('alter table teacher_bank_private.profiles enable row level security'));
     assert.ok(sql.includes('revoke all on schema teacher_bank_private from public, anon, authenticated'));
     assert.ok(sql.includes('revoke all on teacher_bank_private.profiles from public, anon, authenticated'));
@@ -163,8 +174,8 @@ export async function runAdminTests({ test, testAsync, read, fullSchema, migrati
   });
   test('كل RPC إداري يتحقق من الدور داخل الخادم قبل قراءة البيانات', () => {
     const require = fn('require_admin');
-    assert.ok(require.includes('auth.uid() is null'));
-    assert.ok(require.includes("p.id = auth.uid() and p.role = 'admin'"));
+    assert.ok(require.includes("if not teacher_bank_private.has_role('admin') then"));
+    assert.ok(fn('has_role').includes('auth.uid() is not null'));
     assert.ok(require.includes("errcode = '42501'"));
     for (const name of ['get_admin_stats', 'get_admin_teachers']) {
       const body = fn(name);
@@ -172,7 +183,7 @@ export async function runAdminTests({ test, testAsync, read, fullSchema, migrati
       assert.ok(body.includes("set search_path = ''"));
       assert.ok(body.indexOf('perform teacher_bank_private.require_admin()') < body.indexOf(name === 'get_admin_stats' ? 'return jsonb_build_object' : 'with filtered'));
     }
-    assert.ok(fn('get_my_role').includes('where p.id = auth.uid()'));
+    assert.ok(fn('get_my_role').includes('where r.user_id = auth.uid()'));
     assert.ok(sql.includes('revoke all on function public.get_admin_stats() from public, anon, authenticated'));
     assert.ok(sql.includes('grant execute on function public.get_admin_stats() to authenticated'));
   });
@@ -181,7 +192,7 @@ export async function runAdminTests({ test, testAsync, read, fullSchema, migrati
     for (const table of ['subjects', 'teaching_groups', 'questions', 'exams', 'letterheads']) {
       assert.ok(statistics.includes(`(select count(*) from public.${table})`), table);
     }
-    assert.ok(statistics.includes("profiles where role = 'teacher'"));
+    assert.ok(statistics.includes("user_roles where role = 'teacher'"));
     const list = fn('get_admin_teachers');
     for (const alias of ['s', 'g', 'q', 'e', 'l']) assert.ok(list.includes(`${alias}.user_id = f.id`));
     assert.ok(list.includes('u.email_confirmed_at'));

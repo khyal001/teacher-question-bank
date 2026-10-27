@@ -8,6 +8,7 @@ from pglast.stream import RawStream
 
 root = Path(__file__).resolve().parent.parent
 contracts = {}
+function_contracts = {}
 for relative in (
     'supabase/schema.sql',
     'supabase/migrations/20261026_subjects_groups_sharing.sql',
@@ -30,6 +31,14 @@ for relative in (
     if 'preflight_' in relative:
         assert all(isinstance(statement.stmt, ast.SelectStmt) for statement in statements), 'Diagnostic must contain SELECT only'
     elif '.example.sql' not in relative:
+        # Compare final definitions by signature, not historical replacements.
+        # The fresh schema no longer creates then removes legacy role columns.
+        function_contracts[relative] = {
+            (tuple(part.sval for part in statement.stmt.funcname),
+             tuple(RawStream()(param.argType) for param in statement.stmt.parameters or ())):
+                RawStream()(statement.stmt)
+            for statement in statements if isinstance(statement.stmt, ast.CreateFunctionStmt)
+        }
         contracts[relative] = {
             kind.__name__: sorted(RawStream()(statement.stmt) for statement in statements if isinstance(statement.stmt, kind))
             for kind in (ast.CreateFunctionStmt, ast.CreatePolicyStmt, ast.CreateTrigStmt, ast.GrantStmt, ast.IndexStmt)
@@ -43,9 +52,23 @@ profile_layout = contracts['supabase/migrations/20261028_profile_letterhead_layo
 questions_page = contracts['supabase/migrations/20261029_questions_page.sql']
 library_pages = contracts['supabase/migrations/20261030_library_pages_exam_revisions.sql']
 separate_roles = contracts['supabase/migrations/20261031_separate_user_roles.sql']
+final_functions = {}
+for relative, definitions in function_contracts.items():
+    if relative != 'supabase/schema.sql':
+        final_functions.update(definitions)
+assert function_contracts['supabase/schema.sql'] == final_functions, 'Final function contract mismatch'
+print(f'AST parity final functions: {len(final_functions)} definitions match')
 for kind in schema:
-    assert schema[kind] == sorted(base[kind] + admin[kind] + profile_layout[kind] + questions_page[kind] + library_pages[kind] + separate_roles[kind]), f'Schema/migration contract mismatch: {kind}'
-    print(f'AST parity {kind}: {len(schema[kind])} definitions match')
+    if kind == 'CreateFunctionStmt':
+        continue
+    expected = sorted(base[kind] + admin[kind] + profile_layout[kind] + questions_page[kind] + library_pages[kind] + separate_roles[kind])
+    # Compatibility restates the same function ACLs; duplicate grants/revokes
+    # need not be replayed during a new installation.
+    actual = schema[kind]
+    if kind == 'GrantStmt':
+        expected, actual = set(expected), set(actual)
+    assert actual == expected, f'Schema/migration contract mismatch: {kind}'
+    print(f'AST parity {kind}: {len(expected)} definitions match')
 
 
 def evaluate_metadata(node, row):

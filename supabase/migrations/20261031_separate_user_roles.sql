@@ -1,26 +1,86 @@
 begin;
 
 -- BEGIN SEPARATE USER ROLES V1
--- Apply after 20261030. A single transaction preserves all existing roles.
--- Lock profiles while copying roles so no assignment can be lost mid-migration.
+-- Compatibility upgrade after 20261030. Never replay an applied migration.
+-- Fresh installations already have user_roles; only legacy installations copy
+-- their old authorization data here. The live application uses user_roles only.
 do $$
+declare v_legacy boolean; v_columns text[];
 begin
-  if to_regprocedure('teacher_bank_private.has_role(text)') is not null then
-    raise exception 'Existing has_role function requires manual review; nothing is overwritten.';
+  if to_regprocedure('public.save_exam_revision(uuid,text,numeric,jsonb,boolean,uuid,text)') is null then
+    raise exception 'Apply the library/exam revision migration before the role compatibility upgrade.';
+  end if;
+  if to_regclass('teacher_bank_private.profiles') is null
+     or coalesce(obj_description(to_regclass('teacher_bank_private.profiles'), 'pg_class'), '')
+       <> 'teacher-question-bank.profiles.v1' then
+    raise exception 'Known profiles table required; nothing is overwritten.';
+  end if;
+  if exists (select 1 from pg_catalog.pg_class
+      where oid = to_regclass('teacher_bank_private.profiles')
+        and relowner <> 'postgres'::regrole)
+     or exists (select 1 from pg_catalog.pg_namespace where nspname = 'teacher_bank_private'
+        and nspowner <> 'postgres'::regrole) then
+    raise exception 'Untrusted identity/schema owner requires manual review.';
+  end if;
+  lock table teacher_bank_private.profiles in access exclusive mode;
+  select exists (select 1 from pg_catalog.pg_attribute
+    where attrelid = 'teacher_bank_private.profiles'::regclass
+      and attname = 'role' and attnum > 0 and not attisdropped) into v_legacy;
+  if v_legacy then
+    if to_regclass('teacher_bank_private.user_roles') is not null
+       or to_regprocedure('teacher_bank_private.has_role(text)') is not null then
+      raise exception 'Mixed legacy and separate role objects require manual review; nothing is overwritten.';
+    end if;
+    create table teacher_bank_private.user_roles (
+      user_id uuid primary key references auth.users(id) on delete cascade,
+      role text not null check (role in ('teacher', 'admin'))
+    );
+    comment on table teacher_bank_private.user_roles is 'teacher-question-bank.user_roles.v1';
+    alter table teacher_bank_private.user_roles enable row level security;
+    revoke all on teacher_bank_private.user_roles from public, anon, authenticated;
+    revoke all (user_id, role) on teacher_bank_private.user_roles from public, anon, authenticated;
+    create index user_roles_role_idx on teacher_bank_private.user_roles (role, user_id);
+    -- Legacy-only copy: preserve every existing assignment, including admins.
+    insert into teacher_bank_private.user_roles (user_id, role)
+    select id, role from teacher_bank_private.profiles;
+  else
+    if to_regclass('teacher_bank_private.user_roles') is null
+       or coalesce(obj_description(to_regclass('teacher_bank_private.user_roles'), 'pg_class'), '')
+         <> 'teacher-question-bank.user_roles.v1' then
+      raise exception 'Known separate role table required; nothing is overwritten.';
+    end if;
+    if not exists (select 1 from pg_catalog.pg_class
+        where oid = 'teacher_bank_private.user_roles'::regclass
+          and relkind = 'r' and relowner = 'postgres'::regrole and relrowsecurity) then
+      raise exception 'Role table ownership or row security requires manual review.';
+    end if;
+    select array_agg(a.attname || ':' || pg_catalog.format_type(a.atttypid, a.atttypmod)
+      || ':' || a.attnotnull::text order by a.attnum) into v_columns
+    from pg_catalog.pg_attribute a where a.attrelid = 'teacher_bank_private.user_roles'::regclass
+      and a.attnum > 0 and not a.attisdropped;
+    if v_columns is distinct from array['user_id:uuid:true', 'role:text:true']::text[]
+       or not exists (select 1 from pg_catalog.pg_constraint
+         where conrelid = 'teacher_bank_private.user_roles'::regclass and contype = 'p'
+           and pg_catalog.pg_get_constraintdef(oid) = 'PRIMARY KEY (user_id)')
+       or not exists (select 1 from pg_catalog.pg_constraint
+         where conrelid = 'teacher_bank_private.user_roles'::regclass and contype = 'f'
+           and convalidated and confrelid = 'auth.users'::regclass
+           and pg_catalog.pg_get_constraintdef(oid) = 'FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE') then
+      raise exception 'Unexpected role table structure requires manual review.';
+    end if;
+    if exists (select 1 from pg_catalog.pg_policies
+        where schemaname = 'teacher_bank_private' and tablename = 'user_roles') then
+      raise exception 'Role table must have no client policies.';
+    end if;
+    if not exists (select 1 from pg_catalog.pg_proc
+        where oid = to_regprocedure('teacher_bank_private.has_role(text)')
+          and proowner = 'postgres'::regrole and prosecdef
+          and proconfig = array['search_path=""']::text[]) then
+      raise exception 'Known private role helper required; nothing is overwritten.';
+    end if;
   end if;
 end;
 $$;
-lock table teacher_bank_private.profiles in access exclusive mode;
-create table teacher_bank_private.user_roles (
-  user_id uuid primary key references auth.users(id) on delete cascade,
-  role text not null check (role in ('teacher', 'admin'))
-);
-alter table teacher_bank_private.user_roles enable row level security;
-revoke all on teacher_bank_private.user_roles from public, anon, authenticated;
-revoke all (user_id, role) on teacher_bank_private.user_roles from public, anon, authenticated;
-create index user_roles_role_idx on teacher_bank_private.user_roles (role, user_id);
-insert into teacher_bank_private.user_roles (user_id, role)
-select id, role from teacher_bank_private.profiles;
 
 -- Self-only check: no arbitrary user ID and no user-editable metadata.
 -- Private helper: only trusted database functions may execute it.
@@ -139,8 +199,16 @@ revoke all on function public.get_admin_teachers(text,text,integer,integer) from
 grant execute on function public.get_my_role() to authenticated;
 grant execute on function public.get_admin_stats() to authenticated;
 grant execute on function public.get_admin_teachers(text,text,integer,integer) to authenticated;
--- No CASCADE: unknown dependent objects abort the transaction for review.
-alter table teacher_bank_private.profiles drop column role;
+-- No CASCADE: unknown dependencies abort the whole transaction for review.
+do $$
+begin
+  if exists (select 1 from pg_catalog.pg_attribute
+      where attrelid = 'teacher_bank_private.profiles'::regclass
+        and attname = 'role' and attnum > 0 and not attisdropped) then
+    alter table teacher_bank_private.profiles drop column role;
+  end if;
+end;
+$$;
 -- END SEPARATE USER ROLES V1
 
 commit;
